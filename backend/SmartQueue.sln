@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QueueApi", "QueueApi\QueueApi.csproj", "{F2BE2C5A-A91C-40BA-A124-9B88B8DFE7FB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProfileApi", "ProfileApi\ProfileApi.csproj", "{2FBEC7C4-71DB-4893-B96D-E499D1F24C33}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NotificationWorker", "NotificationWorker\NotificationWorker.csproj", "{FA6EF250-0E6A-4E28-8A38-018086D740EE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F2BE2C5A-A91C-40BA-A124-9B88B8DFE7FB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F2BE2C5A-A91C-40BA-A124-9B88B8DFE7FB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F2BE2C5A-A91C-40BA-A124-9B88B8DFE7FB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F2BE2C5A-A91C-40BA-A124-9B88B8DFE7FB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FBEC7C4-71DB-4893-B96D-E499D1F24C33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FBEC7C4-71DB-4893-B96D-E499D1F24C33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FBEC7C4-71DB-4893-B96D-E499D1F24C33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FBEC7C4-71DB-4893-B96D-E499D1F24C33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FA6EF250-0E6A-4E28-8A38-018086D740EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FA6EF250-0E6A-4E28-8A38-018086D740EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FA6EF250-0E6A-4E28-8A38-018086D740EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FA6EF250-0E6A-4E28-8A38-018086D740EE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
