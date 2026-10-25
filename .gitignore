@@ -1,0 +1,20 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# .NET
+**/bin/
+**/obj/
+
+# Next.js
+**/node_modules/
+**/.next/
+
+# IDE / macOS
+.vs/
+.idea/
+.DS_Store
+
+# Local files
+*.log
