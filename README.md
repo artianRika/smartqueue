@@ -47,7 +47,7 @@ SmartQueue uses **one PostgreSQL database (`smartqueue`) with two schemas**.
 | Schema | Service | Tables |
 |---|---|---|
 | `profile` | ProfileApi | `user_profiles`, `organizations` |
-| `queue` | QueueApi & NotificationWorker | `queues`, `counters`, `tickets`, `time_slots`, `bookings`, `outbox_events`, `processed_events`, `notifications`, `service_time_samples` |
+| `queue` | QueueApi & NotificationWorker | `queues`, `counters`, `counter_assignments`, `tickets`, `queue_daily_counters`, `time_slots`, `bookings`, `outbox_events`, `processed_events`, `notifications`, `service_time_samples` |
 
 Each API manages its own EF Core DbContext and migrations.
 
