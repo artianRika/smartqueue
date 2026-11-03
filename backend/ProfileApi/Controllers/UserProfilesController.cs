@@ -16,6 +16,7 @@ public class UserProfilesController : ControllerBase
         _repository = repository;
     }
 
+    // GET: api/userprofiles
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -24,6 +25,7 @@ public class UserProfilesController : ControllerBase
         return Ok(profiles);
     }
 
+    // GET: api/userprofiles/{id}
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -35,6 +37,7 @@ public class UserProfilesController : ControllerBase
         return Ok(profile);
     }
 
+    // POST: api/userprofiles
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateUserProfileRequest request)
@@ -70,6 +73,7 @@ public class UserProfilesController : ControllerBase
             created);
     }
 
+    // PUT: api/userprofiles/{id}
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
         Guid id,
