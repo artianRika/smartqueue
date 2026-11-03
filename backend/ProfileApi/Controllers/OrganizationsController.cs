@@ -16,39 +16,37 @@ public class OrganizationsController : ControllerBase
         _repository = repository;
     }
 
-    // GET: api/organizations
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<ActionResult<IEnumerable<Organization>>> GetAll()
     {
         var organizations = await _repository.GetAllAsync();
-
         return Ok(organizations);
     }
 
-    // GET: api/organizations/{id}
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id)
+    public async Task<ActionResult<Organization>> GetById(Guid id)
     {
         var organization = await _repository.GetByIdAsync(id);
 
-        if (organization is null)
+        if (organization == null)
             return NotFound();
 
         return Ok(organization);
     }
 
-    // POST: api/organizations
     [HttpPost]
-    public async Task<IActionResult> Create(
-        [FromBody] CreateOrganizationRequest request)
+    public async Task<ActionResult<Organization>> Create(
+        CreateOrganizationRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Organization name is required.");
+        var name = request.Name?.Trim();
+
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest("Organization name cannot be empty.");
 
         var organization = new Organization
         {
             Id = Guid.NewGuid(),
-            Name = request.Name.Trim(),
+            Name = name,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -57,41 +55,7 @@ public class OrganizationsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = created.Id },
-            created);
-    }
-
-    // PUT: api/organizations/{id}
-    [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(
-        Guid id,
-        [FromBody] UpdateOrganizationRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.Name))
-            return BadRequest("Organization name is required.");
-
-        var organization = new Organization
-        {
-            Id = id,
-            Name = request.Name.Trim()
-        };
-
-        var updated = await _repository.UpdateAsync(organization);
-
-        if (!updated)
-            return NotFound();
-
-        return NoContent();
-    }
-
-    // DELETE: api/organizations/{id}
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        var deleted = await _repository.DeleteAsync(id);
-
-        if (!deleted)
-            return NotFound();
-
-        return NoContent();
+            created
+        );
     }
 }
