@@ -1,13 +1,15 @@
 "use client";
 
-import { use, Suspense } from "react";
+import { use, Suspense, useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import ActiveTicketView from "@/app/components/ActiveTicketView";
 import type { Ticket } from "@/app/libs/types";
 import { getTicket } from "@/app/libs/api";
-import { useEffect, useState } from "react";
 
-function TicketContent({ id }: { id: string }) {
+function TicketContent({ params }: { params: Promise<{ id: string }> }) {
+  // Unwrapping params INSIDE the Suspense boundary
+  const { id } = use(params);
+  
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,14 +52,12 @@ function TicketContent({ id }: { id: string }) {
 }
 
 export default function TicketPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 flex flex-col">
       <Navbar />
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8 flex flex-col items-center">
-        <Suspense fallback={<div className="py-20 text-center text-sm text-gray-500">Loading...</div>}>
-          <TicketContent id={id} />
+        <Suspense fallback={<div className="py-20 text-center text-sm text-gray-500">Loading active ticket...</div>}>
+          <TicketContent params={params} />
         </Suspense>
       </main>
     </div>
