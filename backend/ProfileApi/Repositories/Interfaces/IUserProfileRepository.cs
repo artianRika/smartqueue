@@ -8,4 +8,6 @@ public interface IUserProfileRepository
     Task<UserProfile?> GetByIdAsync(Guid id);
     Task<UserProfile> CreateAsync(UserProfile profile);
     Task<bool> UpdateAsync(UserProfile profile);
+    Task<bool> UpdateRoleAsync(Guid id, UserRole role);
+    Task<bool> DeleteAsync(Guid id);
 }
