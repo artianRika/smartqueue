@@ -16,6 +16,7 @@ public class UserProfilesController : ControllerBase
         _repository = repository;
     }
 
+    // GET: api/userprofiles
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -24,6 +25,7 @@ public class UserProfilesController : ControllerBase
         return Ok(profiles);
     }
 
+    // GET: api/userprofiles/{id}
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -35,6 +37,7 @@ public class UserProfilesController : ControllerBase
         return Ok(profile);
     }
 
+    // POST: api/userprofiles
     [HttpPost]
     public async Task<IActionResult> Create(
         [FromBody] CreateUserProfileRequest request)
@@ -45,13 +48,14 @@ public class UserProfilesController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.FullName))
             return BadRequest("Full name is required.");
 
+        if (request.Role is null ||
+            !Enum.IsDefined(request.Role.Value))
+            return BadRequest("A valid role is required.");
+
         var existing = await _repository.GetByIdAsync(request.Id);
 
         if (existing is not null)
             return Conflict("A user profile with this ID already exists.");
-        
-        if (request.Role is null || !Enum.IsDefined(request.Role.Value))
-            return BadRequest("A valid role is required.");
 
         var profile = new UserProfile
         {
@@ -70,6 +74,7 @@ public class UserProfilesController : ControllerBase
             created);
     }
 
+    // PUT: api/userprofiles/{id}
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(
         Guid id,
@@ -81,12 +86,45 @@ public class UserProfilesController : ControllerBase
         var profile = new UserProfile
         {
             Id = id,
-            FullName = request.FullName.Trim()
+            FullName = request.FullName.Trim(),
         };
 
         var updated = await _repository.UpdateAsync(profile);
 
         if (!updated)
+            return NotFound();
+
+        return NoContent();
+    }
+
+    // PATCH: api/userprofiles/{id}/role
+    [HttpPatch("{id:guid}/role")]
+    public async Task<IActionResult> UpdateRole(
+        Guid id,
+        [FromBody] UpdateUserRoleRequest request)
+    {
+        if (request.Role is null ||
+            !Enum.IsDefined(request.Role.Value))
+            return BadRequest("A valid role is required.");
+
+        var updated = await _repository.UpdateRoleAsync(
+            id,
+            request.Role.Value);
+
+        if (!updated)
+            return NotFound();
+
+        return NoContent();
+    }
+
+    // DELETE: api/userprofiles/{id}
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        
+        var deleted = await _repository.DeleteAsync(id);
+
+        if (!deleted)
             return NotFound();
 
         return NoContent();

@@ -32,6 +32,7 @@ public class UserProfileRepository : IUserProfileRepository
     public async Task<UserProfile> CreateAsync(UserProfile profile)
     {
         _context.UserProfiles.Add(profile);
+
         await _context.SaveChangesAsync();
 
         return profile;
@@ -46,6 +47,36 @@ public class UserProfileRepository : IUserProfileRepository
             return false;
 
         existing.FullName = profile.FullName;
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> UpdateRoleAsync(Guid id, UserRole role)
+    {
+        var existing = await _context.UserProfiles
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (existing is null)
+            return false;
+
+        existing.Role = role;
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var existing = await _context.UserProfiles
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (existing is null)
+            return false;
+
+        _context.UserProfiles.Remove(existing);
 
         await _context.SaveChangesAsync();
 

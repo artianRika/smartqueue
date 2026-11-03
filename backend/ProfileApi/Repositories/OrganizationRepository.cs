@@ -32,8 +32,39 @@ public class OrganizationRepository : IOrganizationRepository
     public async Task<Organization> CreateAsync(Organization organization)
     {
         _context.Organizations.Add(organization);
+
         await _context.SaveChangesAsync();
 
         return organization;
+    }
+
+    public async Task<bool> UpdateAsync(Organization organization)
+    {
+        var existing = await _context.Organizations
+            .FirstOrDefaultAsync(x => x.Id == organization.Id);
+
+        if (existing is null)
+            return false;
+
+        existing.Name = organization.Name;
+
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
+
+    public async Task<bool> DeleteAsync(Guid id)
+    {
+        var existing = await _context.Organizations
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (existing is null)
+            return false;
+
+        _context.Organizations.Remove(existing);
+
+        await _context.SaveChangesAsync();
+
+        return true;
     }
 }
