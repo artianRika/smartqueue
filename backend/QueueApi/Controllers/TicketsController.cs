@@ -3,6 +3,7 @@ using QueueApi.DTOs;
 using QueueApi.Infrastructure;
 using QueueApi.Models;
 using QueueApi.Repositories.Interfaces;
+using QueueApi.Services;
 
 namespace QueueApi.Controllers;
 
@@ -13,15 +14,18 @@ public class TicketsController : ControllerBase
     private readonly ITicketRepository _tickets;
     private readonly IQueueRepository _queues;
     private readonly ICounterRepository _counters;
+    private readonly IProfileLookup _profiles;
 
     public TicketsController(
         ITicketRepository tickets,
         IQueueRepository queues,
-        ICounterRepository counters)
+        ICounterRepository counters,
+        IProfileLookup profiles)
     {
         _tickets = tickets;
         _queues = queues;
         _counters = counters;
+        _profiles = profiles;
     }
 
     // GET: api/queues/{queueId}/tickets?status=&ticketDate=
@@ -38,7 +42,7 @@ public class TicketsController : ControllerBase
 
         var tickets = await _tickets.GetByQueueAsync(queueId, status, ticketDate);
 
-        return Ok(tickets);
+        return Ok(await MapTicketsAsync(tickets));
     }
 
     // GET: api/tickets/{id}
@@ -50,7 +54,7 @@ public class TicketsController : ControllerBase
         if (ticket is null)
             return NotFound();
 
-        return Ok(ticket);
+        return Ok(await MapTicketAsync(ticket));
     }
 
     // GET: api/tickets/{id}/position
@@ -72,6 +76,11 @@ public class TicketsController : ControllerBase
         if (request.UserId == Guid.Empty)
             return BadRequest("A valid user ID is required.");
 
+        var user = await _profiles.GetUserAsync(request.UserId);
+
+        if (user is null)
+            return BadRequest("User was not found.");
+
         var queue = await _queues.GetByIdAsync(queueId);
 
         if (queue is null)
@@ -85,7 +94,7 @@ public class TicketsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = created.Id },
-            created);
+            TicketResponse.From(created, user.FullName));
     }
 
     // POST: api/counters/{counterId}/tickets/call-next
@@ -113,7 +122,7 @@ public class TicketsController : ControllerBase
         if (ticket is null)
             return NotFound("No waiting tickets.");
 
-        return Ok(ticket);
+        return Ok(await MapTicketAsync(ticket));
     }
 
     // PATCH: api/tickets/{id}/start
@@ -125,7 +134,7 @@ public class TicketsController : ControllerBase
         if (ticket is null)
             return NotFound();
 
-        return Ok(ticket);
+        return Ok(await MapTicketAsync(ticket));
     }
 
     // PATCH: api/tickets/{id}/complete
@@ -137,7 +146,7 @@ public class TicketsController : ControllerBase
         if (ticket is null)
             return NotFound();
 
-        return Ok(ticket);
+        return Ok(await MapTicketAsync(ticket));
     }
 
     // PATCH: api/tickets/{id}/cancel
@@ -149,7 +158,7 @@ public class TicketsController : ControllerBase
         if (ticket is null)
             return NotFound();
 
-        return Ok(ticket);
+        return Ok(await MapTicketAsync(ticket));
     }
 
     // PATCH: api/tickets/{id}/no-show
@@ -161,6 +170,24 @@ public class TicketsController : ControllerBase
         if (ticket is null)
             return NotFound();
 
-        return Ok(ticket);
+        return Ok(await MapTicketAsync(ticket));
+    }
+
+    private async Task<TicketResponse> MapTicketAsync(Ticket ticket)
+    {
+        var user = await _profiles.GetUserAsync(ticket.UserId);
+
+        return TicketResponse.From(ticket, user?.FullName);
+    }
+
+    private async Task<List<TicketResponse>> MapTicketsAsync(List<Ticket> tickets)
+    {
+        var names = await _profiles.GetUserNamesAsync(tickets.Select(ticket => ticket.UserId));
+
+        return tickets
+            .Select(ticket => TicketResponse.From(
+                ticket,
+                names.TryGetValue(ticket.UserId, out var name) ? name : null))
+            .ToList();
     }
 }

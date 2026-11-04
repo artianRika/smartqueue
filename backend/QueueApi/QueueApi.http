@@ -1,7 +1,40 @@
 @QueueApi_HostAddress = http://localhost:5087
+@ProfileApi_HostAddress = http://localhost:5104
 @organizationId = 11111111-1111-1111-1111-111111111111
 @userId = 22222222-2222-2222-2222-222222222222
 @staffUserId = 33333333-3333-3333-3333-333333333333
+
+### Create the organization in ProfileApi first
+POST {{ProfileApi_HostAddress}}/api/organizations
+Content-Type: application/json
+
+{
+  "name": "Heilbronn University"
+}
+
+### Create the visitor in ProfileApi
+# ProfileApi stores roles as numbers: 0 Visitor, 1 Staff, 2 Admin.
+POST {{ProfileApi_HostAddress}}/api/userprofiles
+Content-Type: application/json
+
+{
+  "id": "{{userId}}",
+  "fullName": "Alex Visitor",
+  "email": "alex.visitor@example.com",
+  "role": 0
+}
+
+### Create the staff user in ProfileApi
+POST {{ProfileApi_HostAddress}}/api/userprofiles
+Content-Type: application/json
+
+{
+  "id": "{{staffUserId}}",
+  "fullName": "Sam Staff",
+  "email": "sam.staff@example.com",
+  "role": 1
+}
+
 @queueId = 
 @counterId = 
 @assignmentId = 
@@ -12,6 +45,7 @@ GET {{QueueApi_HostAddress}}/api/ticket-statuses
 Accept: application/json
 
 ### Create queue
+# Paste the organization id returned by ProfileApi into organizationId above.
 POST {{QueueApi_HostAddress}}/api/queues
 Content-Type: application/json
 

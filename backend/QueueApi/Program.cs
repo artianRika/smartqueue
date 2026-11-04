@@ -4,6 +4,7 @@ using QueueApi.Data;
 using QueueApi.Infrastructure;
 using QueueApi.Repositories;
 using QueueApi.Repositories.Interfaces;
+using QueueApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,7 @@ builder.Services.AddScoped<ICounterRepository, CounterRepository>();
 builder.Services.AddScoped<ICounterAssignmentRepository, CounterAssignmentRepository>();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<IQueueDailyCounterRepository, QueueDailyCounterRepository>();
+builder.Services.AddScoped<IProfileLookup, ProfileLookup>();
 
 var app = builder.Build();
 

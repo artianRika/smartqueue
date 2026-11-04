@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using QueueApi.DTOs;
 using QueueApi.Models;
 using QueueApi.Repositories.Interfaces;
+using QueueApi.Services;
 
 namespace QueueApi.Controllers;
 
@@ -13,10 +14,12 @@ public class QueuesController : ControllerBase
     private static readonly Regex TicketPrefixPattern = new("^[A-Z]{1,10}$", RegexOptions.Compiled);
 
     private readonly IQueueRepository _repository;
+    private readonly IProfileLookup _profiles;
 
-    public QueuesController(IQueueRepository repository)
+    public QueuesController(IQueueRepository repository, IProfileLookup profiles)
     {
         _repository = repository;
+        _profiles = profiles;
     }
 
     // GET: api/queues?organizationId=
@@ -24,8 +27,11 @@ public class QueuesController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] Guid? organizationId)
     {
         var queues = await _repository.GetAllAsync(organizationId);
+        var names = await _profiles.GetOrganizationNamesAsync(queues.Select(queue => queue.OrganizationId));
 
-        return Ok(queues);
+        return Ok(queues
+            .Select(queue => QueueResponse.From(queue, NameOrNull(names, queue.OrganizationId)))
+            .ToList());
     }
 
     // GET: api/queues/{id}
@@ -37,7 +43,9 @@ public class QueuesController : ControllerBase
         if (queue is null)
             return NotFound();
 
-        return Ok(queue);
+        var organizationName = await _profiles.GetOrganizationNameAsync(queue.OrganizationId);
+
+        return Ok(QueueResponse.From(queue, organizationName));
     }
 
     // POST: api/queues
@@ -46,6 +54,11 @@ public class QueuesController : ControllerBase
     {
         if (request.OrganizationId == Guid.Empty)
             return BadRequest("A valid organization ID is required.");
+
+        var organizationName = await _profiles.GetOrganizationNameAsync(request.OrganizationId);
+
+        if (organizationName is null)
+            return BadRequest("Organization was not found.");
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Queue name is required.");
@@ -71,7 +84,7 @@ public class QueuesController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = created.Id },
-            created);
+            QueueResponse.From(created, organizationName));
     }
 
     // PUT: api/queues/{id}
@@ -118,5 +131,10 @@ public class QueuesController : ControllerBase
             return NotFound();
 
         return NoContent();
+    }
+
+    private static string? NameOrNull(IReadOnlyDictionary<Guid, string> names, Guid id)
+    {
+        return names.TryGetValue(id, out var name) ? name : null;
     }
 }
