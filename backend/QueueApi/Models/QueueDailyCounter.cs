@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace QueueApi.Models;
 
 public class QueueDailyCounter
@@ -8,5 +10,6 @@ public class QueueDailyCounter
 
     public int LastNumber { get; set; }
 
+    [JsonIgnore]
     public Queue Queue { get; set; } = null!;
 }
