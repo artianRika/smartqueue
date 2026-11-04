@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace QueueApi.Models;
 
 public class Ticket
@@ -29,7 +31,9 @@ public class Ticket
 
     public DateTime? CompletedAt { get; set; }
 
+    [JsonIgnore]
     public Queue Queue { get; set; } = null!;
 
+    [JsonIgnore]
     public Counter? Counter { get; set; }
 }

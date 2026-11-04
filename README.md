@@ -82,6 +82,14 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml up --build -
 
 This starts PostgreSQL, QueueApi, ProfileApi, NotificationWorker, and the Next.js frontend.
 
+Docker Compose does not seed the database. After Postgres is up, load the sample organization, users, queues, counters, and tickets from the project root:
+
+```bash
+./backend/seed-dev.sh
+```
+
+The script uses the Development connection strings in `appsettings.Development.json`, so those credentials must match `.env`. It runs only in Development. Running it again resets the seeded Heilbronn University queues.
+
 ### 3. Check Container Status
 
 ```bash

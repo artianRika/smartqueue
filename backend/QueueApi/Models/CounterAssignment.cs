@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace QueueApi.Models;
 
 public class CounterAssignment
@@ -13,5 +15,6 @@ public class CounterAssignment
 
     public DateTime? EndedAt { get; set; }
 
+    [JsonIgnore]
     public Counter Counter { get; set; } = null!;
 }
