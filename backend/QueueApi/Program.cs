@@ -39,6 +39,21 @@ builder.Services.AddScoped<IProfileLookup, ProfileLookup>();
 
 var app = builder.Build();
 
+if (args.Contains("--seed"))
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        Console.Error.WriteLine("Seeding is only available in Development.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<QueueDbContext>();
+    await QueueDbSeeder.SeedAsync(db);
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

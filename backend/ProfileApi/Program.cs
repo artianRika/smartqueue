@@ -24,6 +24,21 @@ builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
 
 var app = builder.Build();
 
+if (args.Contains("--seed"))
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        Console.Error.WriteLine("Seeding is only available in Development.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ProfileDbContext>();
+    await ProfileDbSeeder.SeedAsync(db);
+    return;
+}
+
 // Swagger in development
 if (app.Environment.IsDevelopment())
 {
