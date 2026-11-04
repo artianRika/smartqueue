@@ -15,7 +15,11 @@ builder.Services.AddSwaggerGen();
 // PostgreSQL
 builder.Services.AddDbContext<ProfileDbContext>(options =>
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("ProfileDb")
+        builder.Configuration.GetConnectionString("ProfileDb"),
+        npgsql => npgsql.MigrationsHistoryTable(
+            "__EFMigrationsHistory",
+            "profile"
+        )
     )
 );
 
