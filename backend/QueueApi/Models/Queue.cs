@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace QueueApi.Models;
 
 public class Queue
@@ -17,7 +19,9 @@ public class Queue
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public ICollection<Counter> Counters { get; set; } = new List<Counter>();
 
+    [JsonIgnore]
     public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
 }

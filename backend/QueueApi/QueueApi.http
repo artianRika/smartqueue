@@ -1,6 +1,87 @@
 @QueueApi_HostAddress = http://localhost:5087
+@organizationId = 11111111-1111-1111-1111-111111111111
+@userId = 22222222-2222-2222-2222-222222222222
+@staffUserId = 33333333-3333-3333-3333-333333333333
+@queueId = 
+@counterId = 
+@assignmentId = 
+@ticketId = 
 
-GET {{QueueApi_HostAddress}}/weatherforecast/
+### Ticket statuses
+GET {{QueueApi_HostAddress}}/api/ticket-statuses
+Accept: application/json
+
+### Create queue
+POST {{QueueApi_HostAddress}}/api/queues
+Content-Type: application/json
+
+{
+  "organizationId": "{{organizationId}}",
+  "name": "Student Registrar",
+  "description": "Enrollment and documents",
+  "ticketPrefix": "REG"
+}
+
+### List queues
+GET {{QueueApi_HostAddress}}/api/queues?organizationId={{organizationId}}
+Accept: application/json
+
+### Open queue
+PATCH {{QueueApi_HostAddress}}/api/queues/{{queueId}}/open
+Content-Type: application/json
+
+{
+  "isOpen": true
+}
+
+### Create counter
+POST {{QueueApi_HostAddress}}/api/queues/{{queueId}}/counters
+Content-Type: application/json
+
+{
+  "name": "Counter 1"
+}
+
+### Open counter
+PATCH {{QueueApi_HostAddress}}/api/counters/{{counterId}}/open
+Content-Type: application/json
+
+{
+  "isOpen": true
+}
+
+### Assign staff
+POST {{QueueApi_HostAddress}}/api/counters/{{counterId}}/assignments
+Content-Type: application/json
+
+{
+  "staffUserId": "{{staffUserId}}"
+}
+
+### Join queue
+POST {{QueueApi_HostAddress}}/api/queues/{{queueId}}/tickets
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}"
+}
+
+### Ticket position
+GET {{QueueApi_HostAddress}}/api/tickets/{{ticketId}}/position
+Accept: application/json
+
+### Call next ticket
+POST {{QueueApi_HostAddress}}/api/counters/{{counterId}}/tickets/call-next
+Accept: application/json
+
+### Start service
+PATCH {{QueueApi_HostAddress}}/api/tickets/{{ticketId}}/start
+
+### Complete ticket
+PATCH {{QueueApi_HostAddress}}/api/tickets/{{ticketId}}/complete
+
+### Daily counters
+GET {{QueueApi_HostAddress}}/api/queues/{{queueId}}/daily-counters
 Accept: application/json
 
 ###
