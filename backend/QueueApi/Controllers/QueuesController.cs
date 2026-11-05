@@ -48,6 +48,18 @@ public class QueuesController : ControllerBase
         return Ok(QueueResponse.From(queue, organizationName));
     }
 
+    // GET: api/queues/{id}/wait-estimate
+    [HttpGet("{id:guid}/wait-estimate")]
+    public async Task<IActionResult> GetWaitEstimate(Guid id)
+    {
+        var queue = await _repository.GetByIdAsync(id);
+
+        if (queue is null)
+            return NotFound();
+
+        return Ok(await _repository.GetWaitEstimateAsync(queue));
+    }
+
     // POST: api/queues
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateQueueRequest request)
