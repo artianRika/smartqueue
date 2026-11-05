@@ -7,5 +7,6 @@ public enum TicketStatus
     Serving = 2,
     Completed = 3,
     Cancelled = 4,
-    NoShow = 5
+    NoShow = 5,
+    Expired = 6
 }
