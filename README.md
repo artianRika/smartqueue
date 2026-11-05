@@ -106,6 +106,8 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml ps
 | **PostgreSQL** | `localhost:5433` |
 | **NotificationWorker** | Background service |
 
+QueueApi and ProfileApi accept browser requests only from the origins in `Cors:AllowedOrigins`. Development allows `http://localhost:3000` through `appsettings.Development.json`. Other environments set it with environment variables such as `Cors__AllowedOrigins__0=https://<frontend-host>`.
+
 ### 5. View Logs
 
 ```bash
