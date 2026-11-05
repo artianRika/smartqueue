@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using QueueApi.Data;
+using QueueApi.DTOs;
 using QueueApi.Infrastructure;
 using QueueApi.Models;
 using QueueApi.Repositories.Interfaces;
@@ -10,9 +11,59 @@ public class QueueRepository : IQueueRepository
 {
     private readonly QueueDbContext _context;
 
+    private const double DefaultServiceMinutes = 5;
+    private const int ServiceTimeSampleSize = 20;
+
     public QueueRepository(QueueDbContext context)
     {
         _context = context;
+    }
+
+    public async Task<WaitEstimateResponse> GetWaitEstimateAsync(Queue queue)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var waitingCount = await _context.Tickets.CountAsync(x =>
+            x.QueueId == queue.Id &&
+            x.TicketDate == today &&
+            x.Status == TicketStatus.Waiting);
+
+        var activeCounters = await _context.Counters.CountAsync(x =>
+            x.QueueId == queue.Id &&
+            x.IsOpen &&
+            x.Assignments.Any(a => a.EndedAt == null));
+
+        var recentServices = await _context.Tickets
+            .AsNoTracking()
+            .Where(x =>
+                x.QueueId == queue.Id &&
+                x.TicketDate == today &&
+                x.Status == TicketStatus.Completed &&
+                x.ServiceStartedAt != null &&
+                x.CompletedAt != null)
+            .OrderByDescending(x => x.CompletedAt)
+            .Take(ServiceTimeSampleSize)
+            .Select(x => new { x.ServiceStartedAt, x.CompletedAt })
+            .ToListAsync();
+
+        var averageServiceMinutes = recentServices.Count == 0
+            ? DefaultServiceMinutes
+            : recentServices.Average(x => (x.CompletedAt!.Value - x.ServiceStartedAt!.Value).TotalMinutes);
+
+        int? estimatedWaitMinutes = queue.IsOpen && activeCounters > 0
+            ? (int)Math.Ceiling(Math.Ceiling((double)waitingCount / activeCounters) * averageServiceMinutes)
+            : null;
+
+        return new WaitEstimateResponse
+        {
+            QueueId = queue.Id,
+            IsOpen = queue.IsOpen,
+            WaitingCount = waitingCount,
+            ActiveCounters = activeCounters,
+            AverageServiceMinutes = Math.Round(averageServiceMinutes, 1),
+            ServiceTimeSampleCount = recentServices.Count,
+            EstimatedWaitMinutes = estimatedWaitMinutes
+        };
     }
 
     public async Task<List<Queue>> GetAllAsync(Guid? organizationId)

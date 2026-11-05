@@ -15,6 +15,10 @@ Accept: application/json
 GET {{QueueApi_HostAddress}}/api/queues/{{queueId}}
 Accept: application/json
 
+### Registrar wait estimate
+GET {{QueueApi_HostAddress}}/api/queues/{{queueId}}/wait-estimate
+Accept: application/json
+
 ### Registrar counters
 GET {{QueueApi_HostAddress}}/api/queues/{{queueId}}/counters
 Accept: application/json

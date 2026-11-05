@@ -51,13 +51,21 @@ public class TicketRepository : ITicketRepository
         var now = DateTime.UtcNow;
         var ticketDate = DateOnly.FromDateTime(now);
 
+        await ExpirePreviousDaysAsync(queueId, ticketDate);
+
+        // Tickets inserted without going through this counter (seed or manual data)
+        // must never be handed out again, so the counter never falls behind them.
         var numberValue = await DbCommands.ScalarAsync(
             _context,
             """
             INSERT INTO queue.queue_daily_counters ("QueueId", "TicketDate", "LastNumber")
-            VALUES (@queueId, @ticketDate, 1)
+            SELECT @queueId, @ticketDate, COALESCE(MAX("Number"), 0) + 1
+            FROM queue.tickets
+            WHERE "QueueId" = @queueId AND "TicketDate" = @ticketDate
             ON CONFLICT ("QueueId", "TicketDate")
-            DO UPDATE SET "LastNumber" = queue.queue_daily_counters."LastNumber" + 1
+            DO UPDATE SET "LastNumber" = GREATEST(
+                queue.queue_daily_counters."LastNumber",
+                EXCLUDED."LastNumber" - 1) + 1
             RETURNING "LastNumber"
             """,
             ("queueId", queueId),
@@ -111,6 +119,8 @@ public class TicketRepository : ITicketRepository
 
         var calledAt = DateTime.UtcNow;
         var ticketDate = DateOnly.FromDateTime(calledAt);
+
+        await ExpirePreviousDaysAsync(queueId, ticketDate);
 
         var ticketIdValue = await DbCommands.ScalarAsync(
             _context,
@@ -220,6 +230,17 @@ public class TicketRepository : ITicketRepository
             Status = ticket.Status,
             Position = ahead + 1
         };
+    }
+
+    // Numbers reset daily, so tickets left open from an earlier day can no longer be served.
+    private Task<int> ExpirePreviousDaysAsync(Guid queueId, DateOnly today)
+    {
+        return _context.Tickets
+            .Where(x =>
+                x.QueueId == queueId &&
+                x.TicketDate < today &&
+                (x.Status == TicketStatus.Waiting || x.Status == TicketStatus.Called))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.Status, TicketStatus.Expired));
     }
 
     private async Task<Ticket?> TransitionAsync(
