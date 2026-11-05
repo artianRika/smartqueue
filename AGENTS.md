@@ -66,8 +66,9 @@ We use one PostgreSQL database with two schemas.
 ### `queue` schema — owned by QueueApi
 
 - `queues`
-- `queue_number_counters`
+- `queue_daily_counters`
 - `counters`
+- `counters_assignments`
 - `tickets`
 - `time_slots`
 - `bookings`
