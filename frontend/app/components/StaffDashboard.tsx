@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { ServiceQueue, Ticket } from "@/app/libs/types";
-import { callNextTicket, markTicketServed, markTicketMissed, toggleQueueStatus, getStaffQueue } from "@/app/libs/api";
+import { toggleQueueStatus } from "@/app/libs/api/queues";
+import { callNextTicket, markTicketServed, markTicketMissed, getStaffQueue } from "@/app/libs/api/staff";
 
 export default function StaffDashboard({ serviceId }: { serviceId: string }) {
   const [queue, setQueue] = useState<ServiceQueue | null>(null);

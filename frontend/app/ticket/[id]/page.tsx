@@ -4,7 +4,7 @@ import { use, Suspense, useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import ActiveTicketView from "@/app/components/ActiveTicketView";
 import type { Ticket } from "@/app/libs/types";
-import { getTicket } from "@/app/libs/api";
+import { getTicket } from "@/app/libs/api/tickets";
 
 function TicketContent({ params }: { params: Promise<{ id: string }> }) {
   // Unwrapping params INSIDE the Suspense boundary

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signUpUser } from "@/app/libs/api/auth";
 
 export default function SignUpForm() {
   const router = useRouter();
@@ -10,18 +11,38 @@ export default function SignUpForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      setErrorMsg("Passwords do not match");
       return;
     }
-    router.push("/services");
+
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      await signUpUser(fullName, email);
+      router.push("/services");
+    } catch (err: any) {
+      console.error("Sign up failed:", err);
+      setErrorMsg(err.message || "Failed to create account.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {errorMsg && (
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 font-medium text-center">
+          {errorMsg}
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5 text-left">
         <label htmlFor="fullName" className="text-sm font-semibold text-gray-700">
           Full Name
@@ -84,9 +105,10 @@ export default function SignUpForm() {
 
       <button
         type="submit"
-        className="w-full py-2.5 px-4 mt-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg shadow-sm transition-colors cursor-pointer"
+        disabled={loading}
+        className="w-full py-2.5 px-4 mt-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-medium rounded-lg shadow-sm transition-colors cursor-pointer"
       >
-        Create Account
+        {loading ? "Creating Account..." : "Create Account"}
       </button>
 
       <div className="text-sm text-gray-600 text-center mt-2">

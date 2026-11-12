@@ -1,57 +1,158 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { joinQueue } from "@/app/libs/api";
+import { joinQueue } from "../libs/api/queues";
 import type { ServiceQueue } from "@/app/libs/types";
 
 export default function ServiceCard({ service }: { service: ServiceQueue }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const paused = service.status === "paused";
+  const [isJoining, setIsJoining] = useState(false);
+  const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
 
-  async function handleJoin() {
-    setBusy(true);
-    const { ticketId } = await joinQueue(service.id);
-    router.push(`/ticket/${ticketId}`);
-  }
+  const isServiceOpen =
+    service.isOpen === true ||
+    service.status?.toLowerCase() === "open" ||
+    service.status?.toLowerCase() === "active";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const syncTicketState = async () => {
+      setIsJoining(false);
+      const activeTickets = JSON.parse(
+        localStorage.getItem("smartQueue_activeTickets") || "{}"
+      );
+      const storedTicketId = activeTickets[service.id];
+
+      if (!storedTicketId) {
+        if (isMounted) setExistingTicketId(null);
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `http://localhost:5087/api/tickets/${storedTicketId}`
+        );
+        if (res.ok) {
+          const ticket = await res.json();
+          const isActive =
+            ticket.status === "Waiting" || ticket.status === "Called";
+
+          if (isActive) {
+            if (isMounted) setExistingTicketId(storedTicketId);
+            return;
+          }
+        }
+
+        // Remove cancelled, completed, or missing tickets from localStorage
+        delete activeTickets[service.id];
+        localStorage.setItem(
+          "smartQueue_activeTickets",
+          JSON.stringify(activeTickets)
+        );
+        if (isMounted) setExistingTicketId(null);
+      } catch {
+        if (isMounted) setExistingTicketId(storedTicketId);
+      }
+    };
+
+    syncTicketState();
+    window.addEventListener("pageshow", syncTicketState);
+    return () => {
+      isMounted = false;
+      window.removeEventListener("pageshow", syncTicketState);
+    };
+  }, [service.id]);
+
+  const handleAction = async () => {
+    if (existingTicketId) {
+      router.push(`/ticket/${existingTicketId}`);
+      return;
+    }
+
+    try {
+      setIsJoining(true);
+      const ticket = await joinQueue(service.id);
+      const assignedTicketId = ticket.ticketId || (ticket as { id?: string }).id;
+
+      if (!assignedTicketId) {
+        throw new Error("No ticket ID returned from server.");
+      }
+
+      const activeTickets = JSON.parse(
+        localStorage.getItem("smartQueue_activeTickets") || "{}"
+      );
+      activeTickets[service.id] = assignedTicketId;
+      localStorage.setItem(
+        "smartQueue_activeTickets",
+        JSON.stringify(activeTickets)
+      );
+
+      setExistingTicketId(assignedTicketId);
+      router.push(`/ticket/${assignedTicketId}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  const getButtonStyle = () => {
+    if (isJoining) {
+      return "bg-[var(--color-sky-600)] opacity-70 text-white cursor-wait";
+    }
+    if (existingTicketId) {
+      return "bg-white text-[var(--color-sky-600)] border-2 border-[var(--color-sky-600)] hover:bg-sky-50";
+    }
+    if (isServiceOpen) {
+      return "bg-[var(--color-sky-600)] hover:opacity-90 text-white";
+    }
+    return "bg-gray-100 text-gray-400 cursor-not-allowed";
+  };
+
+  const getButtonLabel = () => {
+    if (isJoining) return "Joining...";
+    if (existingTicketId) return "View My Ticket";
+    if (isServiceOpen) return "Join queue";
+    return "Unavailable";
+  };
 
   return (
-    <article className="flex flex-col justify-between p-6 bg-white rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition-shadow">
+    <div className="border border-gray-200 p-5 rounded-xl bg-white shadow-sm flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-gray-900">{service.name}</h2>
-          <span
-            className={`px-3 py-1 text-xs font-semibold rounded-full ${
-              paused
-                ? "bg-amber-100 text-amber-800 border border-amber-200"
-                : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-            }`}
-          >
-            {paused ? "Paused" : "Open"}
-          </span>
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="font-semibold text-lg text-gray-900">{service.name}</h3>
+          <div className="flex items-center gap-2">
+            {existingTicketId && (
+              <span className="px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                Ticket Active
+              </span>
+            )}
+            <span
+              className={`px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                isServiceOpen
+                  ? "bg-green-100 text-green-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}
+            >
+              {isServiceOpen ? "Open" : "Paused"}
+            </span>
+          </div>
         </div>
-        
-        <p className="text-sm text-gray-600 mb-6">
-          {paused
-            ? "Queue is currently paused by staff."
-            : `${service.waiting} people waiting • ~${service.estimatedWaitMin} min wait`}
+        <p className="text-sm text-gray-500 mb-4">
+          {service.description ||
+            "Select to join the virtual line and track your ticket status live."}
         </p>
       </div>
 
       <button
-        disabled={paused || busy}
-        onClick={handleJoin}
-        className={`w-full py-2.5 px-4 font-medium rounded-lg shadow-sm transition-colors cursor-pointer ${
-          paused
-            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-            : busy
-            ? "bg-sky-400 text-white cursor-wait"
-            : "bg-sky-600 hover:bg-sky-700 text-white"
-        }`}
+        onClick={handleAction}
+        disabled={isJoining || (!isServiceOpen && !existingTicketId)}
+        className={`w-full py-2.5 px-4 rounded-lg font-medium transition-colors ${getButtonStyle()}`}
       >
-        {paused ? "Unavailable" : busy ? "Joining..." : "Join queue"}
+        {getButtonLabel()}
       </button>
-    </article>
+    </div>
   );
 }
