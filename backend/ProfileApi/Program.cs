@@ -36,6 +36,9 @@ builder.Services.AddDbContext<ProfileDbContext>(options =>
 
 builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
 builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+builder.Services.AddScoped<
+    IOrganizationMembershipRepository,
+    OrganizationMembershipRepository>();
 
 var app = builder.Build();
 

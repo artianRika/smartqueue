@@ -13,6 +13,8 @@ public class ProfileDbContext : DbContext
     public DbSet<Organization> Organizations => Set<Organization>();
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<OrganizationMembership> OrganizationMemberships
+        => Set<OrganizationMembership>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,10 +42,23 @@ public class ProfileDbContext : DbContext
             entity.ToTable("user_profiles");
 
             entity.HasKey(x => x.Id);
+            
+            
+            
+            entity.Property(x => x.ClerkUserId)
+                
+                .HasMaxLength(255);
 
-            entity.Property(x => x.FullName)
+            entity.HasIndex(x => x.ClerkUserId)
+                .IsUnique();
+
+            entity.Property(x => x.FirstName)
                 .IsRequired()
-                .HasMaxLength(200);
+                .HasMaxLength(100);
+
+            entity.Property(x => x.LastName)
+                .IsRequired()
+                .HasMaxLength(100);
 
             entity.Property(x => x.Email)
                 .IsRequired()
@@ -52,10 +67,39 @@ public class ProfileDbContext : DbContext
             entity.HasIndex(x => x.Email)
                 .IsUnique();
 
-            // Store enum as text: Visitor, Staff, Admin
+            // Store enum as text: Visitor, Staff, Organization Admin, System Admin
             entity.Property(x => x.Role)
                 .HasConversion<string>()
                 .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(x => x.CreatedAt)
+                .IsRequired();
+        });
+        
+        //Org Membership Table
+        modelBuilder.Entity<OrganizationMembership>(entity =>
+        {
+            entity.ToTable("organization_memberships");
+
+            entity.HasKey(x => x.Id);
+
+            entity.HasIndex(x => new { x.UserId, x.OrganizationId })
+                .IsUnique();
+
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Organization)
+                .WithMany()
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(x => x.Role)
+                .HasConversion<string>()
+                .HasMaxLength(30)
                 .IsRequired();
 
             entity.Property(x => x.CreatedAt)

@@ -96,9 +96,8 @@ public class CounterAssignmentsController : ControllerBase
         if (staff is null)
             return BadRequest("Staff user was not found.");
 
-        if (staff.Role is not ("Staff" or "Admin"))
-            return BadRequest("Only a staff or admin user can be assigned to a counter.");
-
+        if (staff.Role is not ("Staff" or "OrganizationAdmin" or "SuperAdmin"))
+            return BadRequest("Only Staff, OrganizationAdmin, or SuperAdmin can be assigned to a counter.");
         var counter = await _counters.GetByIdAsync(counterId);
 
         if (counter is null)
@@ -117,7 +116,7 @@ public class CounterAssignmentsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = created.Id },
-            CounterAssignmentResponse.From(created, staff.FullName));
+            CounterAssignmentResponse.From(created, $"{staff.FirstName} {staff.LastName}".Trim()));
     }
 
     // PATCH: api/counter-assignments/{id}/end
@@ -136,7 +135,7 @@ public class CounterAssignmentsController : ControllerBase
     {
         var staff = await _profiles.GetUserAsync(assignment.StaffUserId);
 
-        return CounterAssignmentResponse.From(assignment, staff?.FullName);
+        return CounterAssignmentResponse.From(assignment, $"{staff.FirstName} {staff.LastName}".Trim());
     }
 
     private async Task<List<CounterAssignmentResponse>> MapAssignmentsAsync(

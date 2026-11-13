@@ -18,7 +18,7 @@ public class UserProfileRepository : IUserProfileRepository
     {
         return await _context.UserProfiles
             .AsNoTracking()
-            .OrderBy(x => x.FullName)
+            .OrderBy(x => x.FirstName)
             .ToListAsync();
     }
 
@@ -46,7 +46,8 @@ public class UserProfileRepository : IUserProfileRepository
         if (existing is null)
             return false;
 
-        existing.FullName = profile.FullName;
+        existing.FirstName = profile.FirstName;
+        existing.LastName = profile.LastName;
 
         await _context.SaveChangesAsync();
 

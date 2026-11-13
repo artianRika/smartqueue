@@ -45,8 +45,10 @@ public class UserProfilesController : ControllerBase
         if (request.Id == Guid.Empty)
             return BadRequest("A valid user ID is required.");
 
-        if (string.IsNullOrWhiteSpace(request.FullName))
-            return BadRequest("Full name is required.");
+        if (string.IsNullOrWhiteSpace(request.FirstName))
+            return BadRequest("First name is required.");
+         if (string.IsNullOrWhiteSpace(request.LastName))
+            return BadRequest("Last name is required.");
 
         if (request.Role is null ||
             !Enum.IsDefined(request.Role.Value))
@@ -60,7 +62,8 @@ public class UserProfilesController : ControllerBase
         var profile = new UserProfile
         {
             Id = request.Id,
-            FullName = request.FullName.Trim(),
+            FirstName = request.FirstName,
+            LastName = request.LastName,
             Email = request.Email.Trim(),
             Role = request.Role.Value,
             CreatedAt = DateTime.UtcNow
@@ -80,13 +83,14 @@ public class UserProfilesController : ControllerBase
         Guid id,
         [FromBody] UpdateUserProfileRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.FullName))
-            return BadRequest("Full name is required.");
+        if (string.IsNullOrWhiteSpace(request.FirstName))
+            return BadRequest("First name is required.");
 
         var profile = new UserProfile
         {
             Id = id,
-            FullName = request.FullName.Trim(),
+            FirstName = request.FirstName,
+            LastName = request.LastName
         };
 
         var updated = await _repository.UpdateAsync(profile);
