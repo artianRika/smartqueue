@@ -41,14 +41,19 @@ public class ProfileLookup : IProfileLookup
         return users.TryGetValue(userId, out var user) ? user : null;
     }
 
-    public async Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(IEnumerable<Guid> userIds)
+    public async Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(
+        IEnumerable<Guid> userIds)
     {
         var users = await QueryUsersAsync(userIds);
 
-        return users.ToDictionary(pair => pair.Key, pair => pair.Value.FullName);
+        return users.ToDictionary(
+            pair => pair.Key,
+            pair => $"{pair.Value.FirstName} {pair.Value.LastName}".Trim());
     }
 
-    private async Task<Dictionary<Guid, string>> QueryNamesAsync(string sql, IEnumerable<Guid> ids)
+    private async Task<Dictionary<Guid, string>> QueryNamesAsync(
+        string sql,
+        IEnumerable<Guid> ids)
     {
         var rows = new Dictionary<Guid, string>();
 
@@ -60,13 +65,14 @@ public class ProfileLookup : IProfileLookup
         return rows;
     }
 
-    private async Task<Dictionary<Guid, ProfileUser>> QueryUsersAsync(IEnumerable<Guid> ids)
+    private async Task<Dictionary<Guid, ProfileUser>> QueryUsersAsync(
+        IEnumerable<Guid> ids)
     {
         var users = new Dictionary<Guid, ProfileUser>();
 
         await QueryAsync(
             """
-            SELECT "Id", "FullName", "Role"
+            SELECT "Id", "FirstName", "LastName", "Role"
             FROM profile.user_profiles
             WHERE "Id" = ANY(@ids)
             """,
@@ -74,20 +80,31 @@ public class ProfileLookup : IProfileLookup
             reader =>
             {
                 var id = reader.GetGuid(0);
+
+                var firstName = reader.GetString(1);
+                var lastName = reader.GetString(2);
+
                 users[id] = new ProfileUser
                 {
                     Id = id,
-                    FullName = reader.GetString(1),
-                    Role = reader.GetString(2)
+                    FirstName = firstName,
+                    LastName = lastName,
+                    Role = reader.GetString(3)
                 };
             });
 
         return users;
     }
 
-    private async Task QueryAsync(string sql, IEnumerable<Guid> ids, Action<NpgsqlDataReader> read)
+    private async Task QueryAsync(
+        string sql,
+        IEnumerable<Guid> ids,
+        Action<NpgsqlDataReader> read)
     {
-        var idList = ids.Where(id => id != Guid.Empty).Distinct().ToArray();
+        var idList = ids
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray();
 
         if (idList.Length == 0)
             return;
@@ -99,13 +116,15 @@ public class ProfileLookup : IProfileLookup
 
         await using var command = new NpgsqlCommand(sql, connection)
         {
-            Transaction = _context.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction
+            Transaction = _context.Database.CurrentTransaction?
+                .GetDbTransaction() as NpgsqlTransaction
         };
 
-        command.Parameters.Add(new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
-        {
-            Value = idList
-        });
+        command.Parameters.Add(
+            new NpgsqlParameter("ids", NpgsqlDbType.Array | NpgsqlDbType.Uuid)
+            {
+                Value = idList
+            });
 
         await using var reader = await command.ExecuteReaderAsync();
 

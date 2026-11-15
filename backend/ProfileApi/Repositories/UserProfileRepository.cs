@@ -18,7 +18,7 @@ public class UserProfileRepository : IUserProfileRepository
     {
         return await _context.UserProfiles
             .AsNoTracking()
-            .OrderBy(x => x.FullName)
+            .OrderBy(x => x.FirstName)
             .ToListAsync();
     }
 
@@ -29,10 +29,17 @@ public class UserProfileRepository : IUserProfileRepository
             .FirstOrDefaultAsync(x => x.Id == id);
     }
 
+    public async Task<UserProfile?> GetByClerkUserIdAsync(
+        string clerkUserId)
+    {
+        return await _context.UserProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.ClerkUserId == clerkUserId);
+    }
+
     public async Task<UserProfile> CreateAsync(UserProfile profile)
     {
         _context.UserProfiles.Add(profile);
-
         await _context.SaveChangesAsync();
 
         return profile;
@@ -46,7 +53,8 @@ public class UserProfileRepository : IUserProfileRepository
         if (existing is null)
             return false;
 
-        existing.FullName = profile.FullName;
+        existing.FirstName = profile.FirstName;
+        existing.LastName = profile.LastName;
 
         await _context.SaveChangesAsync();
 
@@ -77,7 +85,6 @@ public class UserProfileRepository : IUserProfileRepository
             return false;
 
         _context.UserProfiles.Remove(existing);
-
         await _context.SaveChangesAsync();
 
         return true;
