@@ -6,6 +6,7 @@ public interface IUserProfileRepository
 {
     Task<List<UserProfile>> GetAllAsync();
     Task<UserProfile?> GetByIdAsync(Guid id);
+    Task<UserProfile?> GetByClerkUserIdAsync(string clerkUserId);
     Task<UserProfile> CreateAsync(UserProfile profile);
     Task<bool> UpdateAsync(UserProfile profile);
     Task<bool> UpdateRoleAsync(Guid id, UserRole role);

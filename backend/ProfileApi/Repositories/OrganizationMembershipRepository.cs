@@ -54,6 +54,17 @@ public class OrganizationMembershipRepository
             .Where(x => x.UserId == userId)
             .ToListAsync();
     }
+    
+    public async Task<OrganizationMembership?> GetByUserAndOrganizationAsync(
+        Guid userId,
+        Guid organizationId)
+    {
+        return await _context.OrganizationMemberships
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x =>
+                x.UserId == userId &&
+                x.OrganizationId == organizationId);
+    }
 
     public async Task<bool> UserExistsAsync(Guid userId)
     {

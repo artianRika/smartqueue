@@ -13,6 +13,10 @@ public interface IOrganizationMembershipRepository
 
     Task<List<OrganizationMembership>> GetByUserAsync(
         Guid userId);
+    
+    Task<OrganizationMembership?> GetByUserAndOrganizationAsync(
+        Guid userId,
+        Guid organizationId);
 
     Task<bool> UserExistsAsync(Guid userId);
 

@@ -1,17 +1,22 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using ProfileApi.Data;
 using ProfileApi.Repositories;
 using ProfileApi.Repositories.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register controllers
+// Controllers
 builder.Services.AddControllers();
 
-// CORS for the frontend
+// CORS
 const string FrontendCorsPolicy = "Frontend";
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var allowedOrigins =
+    builder.Configuration.GetSection("Cors:AllowedOrigins")
+        .Get<string[]>() ?? [];
 
 builder.Services.AddCors(options =>
     options.AddPolicy(FrontendCorsPolicy, policy => policy
@@ -19,9 +24,105 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
+// Clerk JWT authentication
+var clerkAuthority = builder.Configuration["Clerk:Authority"];
+
+if (string.IsNullOrWhiteSpace(clerkAuthority))
+    throw new InvalidOperationException(
+        "Clerk:Authority is missing.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = clerkAuthority;
+        options.RequireHttpsMetadata = true;
+
+        options.MapInboundClaims = false;
+        
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                Console.WriteLine(
+                    $"Authorization header present: " +
+                    $"{context.Request.Headers.ContainsKey("Authorization")}"
+                );
+
+                return Task.CompletedTask;
+            },
+
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine("JWT VALIDATED SUCCESSFULLY!");
+
+                Console.WriteLine(
+                    $"Clerk User ID: {context.Principal?.FindFirst("sub")?.Value}"
+                );
+
+                return Task.CompletedTask;
+            },
+
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"JWT FAILED: {context.Exception}");
+
+                return Task.CompletedTask;
+            },
+
+            OnChallenge = context =>
+            {
+                Console.WriteLine(
+                    $"JWT CHALLENGE: {context.Error} - {context.ErrorDescription}"
+                );
+
+                return Task.CompletedTask;
+            }
+        };
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = clerkAuthority.TrimEnd('/'),
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            NameClaimType = "sub"
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter your Clerk JWT token."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 // PostgreSQL
 builder.Services.AddDbContext<ProfileDbContext>(options =>
@@ -34,6 +135,7 @@ builder.Services.AddDbContext<ProfileDbContext>(options =>
     )
 );
 
+// Repositories
 builder.Services.AddScoped<IUserProfileRepository, UserProfileRepository>();
 builder.Services.AddScoped<IOrganizationRepository, OrganizationRepository>();
 builder.Services.AddScoped<
@@ -42,34 +144,45 @@ builder.Services.AddScoped<
 
 var app = builder.Build();
 
+// Seeder
 if (args.Contains("--seed"))
 {
     if (!app.Environment.IsDevelopment())
     {
-        Console.Error.WriteLine("Seeding is only available in Development.");
+        Console.Error.WriteLine(
+            "Seeding is only available in Development.");
+
         Environment.ExitCode = 1;
         return;
     }
 
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<ProfileDbContext>();
+
+    var db = scope.ServiceProvider
+        .GetRequiredService<ProfileDbContext>();
+
     await ProfileDbSeeder.SeedAsync(db);
     return;
 }
 
-// Swagger in development
+// Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Before HTTPS redirection so preflight requests are answered instead of redirected
 app.UseCors(FrontendCorsPolicy);
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
-// Map controller endpoints
+// Authentication must come before authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
