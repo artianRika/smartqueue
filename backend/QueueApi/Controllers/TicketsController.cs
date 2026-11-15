@@ -94,7 +94,7 @@ public class TicketsController : ControllerBase
         return CreatedAtAction(
             nameof(GetById),
             new { id = created.Id },
-            TicketResponse.From(created, user.FullName));
+            TicketResponse.From(created, $"{user.FirstName} {user.LastName}".Trim()));
     }
 
     // POST: api/counters/{counterId}/tickets/call-next
@@ -177,7 +177,7 @@ public class TicketsController : ControllerBase
     {
         var user = await _profiles.GetUserAsync(ticket.UserId);
 
-        return TicketResponse.From(ticket, user?.FullName);
+        return TicketResponse.From(ticket, $"{user.FirstName} {user.LastName}".Trim());
     }
 
     private async Task<List<TicketResponse>> MapTicketsAsync(List<Ticket> tickets)

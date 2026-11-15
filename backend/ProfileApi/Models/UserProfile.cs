@@ -2,10 +2,13 @@ namespace ProfileApi.Models;
 
 public class UserProfile
 {
-    // Matches the Supabase Auth user ID
-    public Guid Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
-    public string FullName { get; set; } = string.Empty;
+    public string? ClerkUserId { get; set; }
+
+    public string FirstName { get; set; } = string.Empty;
+
+    public string LastName { get; set; } = string.Empty;
 
     public string Email { get; set; } = string.Empty;
 
