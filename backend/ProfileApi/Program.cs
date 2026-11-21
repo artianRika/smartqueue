@@ -93,6 +93,8 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddHealthChecks();
+
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 
@@ -189,6 +191,7 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();
