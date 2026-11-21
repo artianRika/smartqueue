@@ -6,56 +6,67 @@ SmartQueue replaces physical waiting lines with digital tickets and a live queue
 
 ---
 
-## 🚀 Key Features & Technical Highlights
+## Implemented vs Planned
 
-- **Authentication & Authorization:** Supabase Auth with role-based access for users and administrators.
-- **Virtual Queues:** Digital tickets, live queue positions, and estimated waiting times.
-- **Time Slots & Bookings:** Reserve available service slots.
-- **Live UI Synchronization:** Real-time updates using Azure SignalR Service.
-- **Transactional Outbox:** Reliably publishes events through Azure Service Bus.
-- **Automatic Call Timeouts:** Scheduled messages mark unclaimed tickets as missed.
-- **Queue Flexibility:** Custom notification lead times and "Come Back Later" position reordering.
-- **Safe Multi-Counter Processing:** Concurrency control prevents duplicate ticket assignment.
-- **Cryptographic QR Check-in:** Signed QR tokens verify ticket arrivals.
+### Implemented
+
+- **Authentication (Clerk):** ProfileApi validates Clerk JWTs. Frontend sign-in uses Clerk.
+- **Profiles & organizations:** User profiles, organizations, and organization memberships.
+- **Virtual queues:** Queues, counters, counter assignments, daily ticket numbers, ticket lifecycle.
+- **Concurrency control:** Atomic ticket numbering and `FOR UPDATE SKIP LOCKED` for call-next.
+- **Wait estimates:** Simple average based on recent completed tickets in the queue.
+- **Transactional outbox:** Ticket changes write to `queue.outbox_events` in the same transaction; QueueApi publishes to the Azure Service Bus `ticket-events` topic (emulator locally).
+- **Local stack:** Docker Compose for Postgres, Service Bus emulator, APIs, worker, and frontend.
+- **CI:** GitHub Actions builds the three .NET services and the Next.js frontend.
+
+### Planned
+
+- **QueueApi Clerk JWT** and membership-based staff authorization (in progress on this branch).
+- **NotificationWorker** consuming `ticket-events` with idempotent `processed_events` / `notifications`.
+- **Azure SignalR** live UI updates (negotiate + worker push).
+- **Come Back Later** ticket reordering.
+- **Cryptographic QR check-in** with secrets in Azure Key Vault.
+- **Automatic call timeouts** via scheduled Service Bus messages.
+- **Time slots & bookings.**
+- **Terraform** Azure infrastructure and deploy workflows.
+- **k6** load tests; Azure Monitor / Application Insights / OpenTelemetry.
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Category | Technologies |
 |---|---|
 | **Frontend** | Next.js, TypeScript |
 | **Backend** | ASP.NET Core (.NET 10), .NET Worker Service |
-| **Authentication** | Supabase Auth |
+| **Authentication** | Clerk |
 | **Database** | PostgreSQL, Entity Framework Core |
-| **Hosting** | Azure Container Apps |
-| **Messaging** | Azure Service Bus Topics, Dead-Letter Queues |
-| **Real-Time Communication** | Azure SignalR Service |
-| **Secrets Management** | Azure Key Vault |
-| **Infrastructure as Code** | Terraform |
-| **Monitoring** | Azure Monitor, Application Insights, OpenTelemetry |
-| **Load Testing** | k6 |
-| **CI/CD** | GitHub Actions |
+| **Hosting** | Azure Container Apps (planned) |
+| **Messaging** | Azure Service Bus Topics (emulator locally) |
+| **Real-Time Communication** | Azure SignalR Service (planned) |
+| **Secrets Management** | Azure Key Vault (planned) |
+| **Infrastructure as Code** | Terraform (planned) |
+| **Monitoring** | Azure Monitor, Application Insights, OpenTelemetry (planned) |
+| **Load Testing** | k6 (planned) |
+| **CI/CD** | GitHub Actions (CI build today) |
 | **Local Development** | Docker Compose |
 
 ---
 
-## 🗄️ Database Architecture
+## Database Architecture
 
 SmartQueue uses **one PostgreSQL database (`smartqueue`) with two schemas**.
 
 | Schema | Service | Tables |
 |---|---|---|
-| `profile` | ProfileApi | `user_profiles`, `organizations` |
-| `queue` | QueueApi & NotificationWorker | `queues`, `counters`, `counter_assignments`, `tickets`, `queue_daily_counters`, `time_slots`, `bookings`, `outbox_events`, `processed_events`, `notifications`, `service_time_samples` |
+| `profile` | ProfileApi | `user_profiles`, `organizations`, `organization_memberships` |
+| `queue` | QueueApi (& NotificationWorker) | **MVP today:** `queues`, `counters`, `counter_assignments`, `tickets`, `queue_daily_counters`, `outbox_events`. **Next:** `processed_events`, `notifications`. **Later:** `time_slots`, `bookings`, `service_time_samples` |
 
-Each API manages its own EF Core DbContext and migrations.
-
-Both schemas share the same database connection but remain logically separated.
+Each API manages its own EF Core DbContext and migrations. QueueApi may read `profile.*` for display names and roles; there are no cross-schema foreign keys.
 
 ---
 
-## 🐳 Running SmartQueue Locally
+## Running SmartQueue Locally
 
 ### Prerequisites
 
@@ -72,7 +83,7 @@ From the project root:
 cp .env.example .env
 ```
 
-Update `.env` with your local PostgreSQL credentials and set `SERVICEBUS_SQL_PASSWORD`. The Service Bus emulator's SQL Server container needs it, and it must meet SQL Server complexity rules.
+Update `.env` with PostgreSQL credentials, `SERVICEBUS_SQL_PASSWORD` (SQL Server complexity rules), and Clerk keys for the frontend. Development API connection strings in `appsettings.Development.json` must match `.env` (default password `smartqueue_dev`).
 
 ### 2. Start All Services
 
@@ -88,7 +99,7 @@ Docker Compose does not seed the database. After Postgres is up, load the sample
 ./backend/seed-dev.sh
 ```
 
-The script uses the Development connection strings in `appsettings.Development.json`, so those credentials must match `.env`. It runs only in Development. Running it again resets the seeded Heilbronn University queues.
+The script uses the Development connection strings in `appsettings.Development.json`. It runs only in Development. Running it again resets the seeded Heilbronn University queues.
 
 ### 3. Check Container Status
 
@@ -109,7 +120,7 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml ps
 
 Both APIs expose `GET /health`.
 
-QueueApi writes ticket events to `queue.outbox_events` in the same transaction as the ticket change. A background publisher sends them to the `ticket-events` topic. If `ServiceBus:ConnectionString` is not set, events stay in the outbox until it is.
+QueueApi writes ticket events to `queue.outbox_events` in the same transaction as the ticket change. A background publisher sends them to the `ticket-events` topic. If `ServiceBus:ConnectionString` is not set, events stay in the outbox until it is. The NotificationWorker will consume that subscription once implemented; until then the publisher still delivers messages to the emulator.
 
 QueueApi and ProfileApi accept browser requests only from the origins in `Cors:AllowedOrigins`. Development allows `http://localhost:3000` through `appsettings.Development.json`. Other environments set it with environment variables such as `Cors__AllowedOrigins__0=https://<frontend-host>`.
 
@@ -131,7 +142,7 @@ This preserves the PostgreSQL data volume.
 
 ---
 
-## 💻 Development Commands
+## Development Commands
 
 ### Build Backend Services
 
@@ -151,16 +162,15 @@ npm ci
 npm run dev
 ```
 
+Set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` in `frontend/.env.local` (or use the root `.env` when building via Compose).
+
 ---
 
-## 🔄 Continuous Integration
+## Continuous Integration
 
 SmartQueue uses **GitHub Actions** for Continuous Integration (CI).
 
-The workflow automatically runs when:
-
-- A Pull Request targets `main`.
-- Code is pushed to `main`.
+The workflow runs when a pull request targets `main` or `develop`, or when code is pushed to those branches.
 
 ### CI Checks
 
@@ -171,11 +181,11 @@ The workflow automatically runs when:
 
 **Workflow location:** `.github/workflows/ci.yml`
 
-Automated tests will be added as development progresses.
+Automated tests and deploy workflows will be added as development progresses.
 
 ---
 
-## 👥 Contributors
+## Contributors
 
 - **Artian Rika**
 - **Liburn Lumani**
@@ -183,4 +193,4 @@ Automated tests will be added as development progresses.
 
 ---
 
-**Project Status:** Under active development. Some features and Azure integrations described above are planned and not yet implemented.
+**Project Status:** Under active development. See **Implemented vs Planned** above for what works today.
