@@ -15,6 +15,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Storage backend required by the Service Bus emulator
+  servicebus-sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SERVICEBUS_SQL_PASSWORD:?Set SERVICEBUS_SQL_PASSWORD in .env}
+
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    volumes:
+      - ./servicebus/Config.json:/ServiceBus_Emulator/ConfigFiles/Config.json
+    ports:
+      - "5672:5672"
+    environment:
+      ACCEPT_EULA: "Y"
+      SQL_SERVER: servicebus-sql
+      MSSQL_SA_PASSWORD: ${SERVICEBUS_SQL_PASSWORD:?Set SERVICEBUS_SQL_PASSWORD in .env}
+    depends_on:
+      - servicebus-sql
+
   queue-api:
     build:
       context: ../backend
@@ -24,9 +44,12 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__QueueDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ServiceBus__ConnectionString: "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
     depends_on:
       postgres:
         condition: service_healthy
+      servicebus:
+        condition: service_started
 
   profile-api:
     build:
