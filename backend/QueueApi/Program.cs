@@ -114,12 +114,25 @@ if (!string.IsNullOrWhiteSpace(serviceBusConnectionString))
     builder.Services.AddHostedService<OutboxPublisher>();
 }
 
+var signalRConnectionString = builder.Configuration["SignalR:ConnectionString"];
+
+if (!string.IsNullOrWhiteSpace(signalRConnectionString))
+{
+    builder.Services.AddSingleton(new SignalRNegotiateService(signalRConnectionString));
+}
+
 var app = builder.Build();
 
 if (string.IsNullOrWhiteSpace(serviceBusConnectionString))
 {
     app.Logger.LogWarning(
         "ServiceBus:ConnectionString is not set. Outbox events will be stored but not published.");
+}
+
+if (string.IsNullOrWhiteSpace(signalRConnectionString))
+{
+    app.Logger.LogWarning(
+        "SignalR:ConnectionString is not set. POST /api/signalr/negotiate returns 503.");
 }
 
 if (args.Contains("--seed"))
