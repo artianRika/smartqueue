@@ -82,6 +82,48 @@ namespace QueueApi.Migrations
                     b.ToTable("counter_assignments", "queue");
                 });
 
+            modelBuilder.Entity("QueueApi.Models.OutboxEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("QueueId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasFilter("\"PublishedAt\" IS NULL");
+
+                    b.ToTable("outbox_events", "queue");
+                });
+
             modelBuilder.Entity("QueueApi.Models.Queue", b =>
                 {
                     b.Property<Guid>("Id")

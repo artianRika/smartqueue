@@ -18,6 +18,8 @@ public class QueueDbContext : DbContext
     public DbSet<QueueDailyCounter> QueueDailyCounters
         => Set<QueueDailyCounter>();
 
+    public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("queue");
@@ -166,6 +168,29 @@ public class QueueDbContext : DbContext
                     "\"LastNumber\" >= 0"
                 )
             );
+        });
+
+        // OUTBOX EVENTS
+        modelBuilder.Entity<OutboxEvent>(entity =>
+        {
+            entity.ToTable("outbox_events");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Type)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Payload)
+                .IsRequired()
+                .HasColumnType("jsonb");
+
+            entity.Property(x => x.LastError)
+                .HasMaxLength(2000);
+
+            // Keeps the publisher's pending-events query small as published rows grow
+            entity.HasIndex(x => x.OccurredAt)
+                .HasFilter("\"PublishedAt\" IS NULL");
         });
     }
 }
