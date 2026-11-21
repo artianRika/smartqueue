@@ -83,10 +83,17 @@ services:
       dockerfile: NotificationWorker/Dockerfile
     environment:
       DOTNET_ENVIRONMENT: Development
-      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ConnectionStrings__QueueDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      ServiceBus__ConnectionString: "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      ServiceBus__TopicName: ticket-events
+      ServiceBus__SubscriptionName: notification-worker
     depends_on:
       postgres:
         condition: service_healthy
+      servicebus:
+        condition: service_started
+      queue-api:
+        condition: service_started
 
   frontend:
     build:
