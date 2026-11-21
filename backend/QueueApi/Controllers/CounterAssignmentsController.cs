@@ -135,7 +135,9 @@ public class CounterAssignmentsController : ControllerBase
     {
         var staff = await _profiles.GetUserAsync(assignment.StaffUserId);
 
-        return CounterAssignmentResponse.From(assignment, $"{staff.FirstName} {staff.LastName}".Trim());
+        var name = staff is null ? null : $"{staff.FirstName} {staff.LastName}".Trim();
+
+        return CounterAssignmentResponse.From(assignment, name);
     }
 
     private async Task<List<CounterAssignmentResponse>> MapAssignmentsAsync(

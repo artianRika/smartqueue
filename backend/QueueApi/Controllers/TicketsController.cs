@@ -177,7 +177,9 @@ public class TicketsController : ControllerBase
     {
         var user = await _profiles.GetUserAsync(ticket.UserId);
 
-        return TicketResponse.From(ticket, $"{user.FirstName} {user.LastName}".Trim());
+        var name = user is null ? null : $"{user.FirstName} {user.LastName}".Trim();
+
+        return TicketResponse.From(ticket, name);
     }
 
     private async Task<List<TicketResponse>> MapTicketsAsync(List<Ticket> tickets)
