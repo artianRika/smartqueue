@@ -1,7 +1,9 @@
 using System.Text.Json.Serialization;
+using Azure.Messaging.ServiceBus;
 using Microsoft.EntityFrameworkCore;
 using QueueApi.Data;
 using QueueApi.Infrastructure;
+using QueueApi.Messaging;
 using QueueApi.Repositories;
 using QueueApi.Repositories.Interfaces;
 using QueueApi.Services;
@@ -49,7 +51,21 @@ builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<IQueueDailyCounterRepository, QueueDailyCounterRepository>();
 builder.Services.AddScoped<IProfileLookup, ProfileLookup>();
 
+var serviceBusConnectionString = builder.Configuration["ServiceBus:ConnectionString"];
+
+if (!string.IsNullOrWhiteSpace(serviceBusConnectionString))
+{
+    builder.Services.AddSingleton(new ServiceBusClient(serviceBusConnectionString));
+    builder.Services.AddHostedService<OutboxPublisher>();
+}
+
 var app = builder.Build();
+
+if (string.IsNullOrWhiteSpace(serviceBusConnectionString))
+{
+    app.Logger.LogWarning(
+        "ServiceBus:ConnectionString is not set. Outbox events will be stored but not published.");
+}
 
 if (args.Contains("--seed"))
 {
