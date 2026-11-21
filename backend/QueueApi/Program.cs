@@ -79,7 +79,10 @@ if (app.Environment.IsDevelopment())
 // Before HTTPS redirection so preflight requests are answered instead of redirected
 app.UseCors(FrontendCorsPolicy);
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.MapControllers();
 
