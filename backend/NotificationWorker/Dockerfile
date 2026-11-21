@@ -4,7 +4,8 @@ WORKDIR /src
 COPY . .
 RUN dotnet publish NotificationWorker/NotificationWorker.csproj -c Release -o /app/publish
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+# AspNetCore shared framework is required by Azure SignalR Management
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "NotificationWorker.dll"]
