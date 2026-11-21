@@ -165,6 +165,12 @@ if (args.Contains("--seed"))
     return;
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ProfileDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 // Swagger
 if (app.Environment.IsDevelopment())
 {
