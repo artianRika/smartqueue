@@ -72,7 +72,7 @@ From the project root:
 cp .env.example .env
 ```
 
-Update `.env` with your local PostgreSQL credentials.
+Update `.env` with your local PostgreSQL credentials and set `SERVICEBUS_SQL_PASSWORD`. The Service Bus emulator's SQL Server container needs it, and it must meet SQL Server complexity rules.
 
 ### 2. Start All Services
 
@@ -80,7 +80,7 @@ Update `.env` with your local PostgreSQL credentials.
 docker compose --env-file .env -f infrastructure/docker-compose.yml up --build -d
 ```
 
-This starts PostgreSQL, QueueApi, ProfileApi, NotificationWorker, and the Next.js frontend.
+This starts PostgreSQL, the Azure Service Bus emulator, QueueApi, ProfileApi, NotificationWorker, and the Next.js frontend. Both APIs apply their EF Core migrations on startup.
 
 Docker Compose does not seed the database. After Postgres is up, load the sample organization, users, queues, counters, and tickets from the project root:
 
@@ -104,7 +104,12 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml ps
 | **QueueApi** | `http://localhost:5001` |
 | **ProfileApi** | `http://localhost:5002` |
 | **PostgreSQL** | `localhost:5433` |
+| **Service Bus emulator** | `localhost:5672` (AMQP) |
 | **NotificationWorker** | Background service |
+
+Both APIs expose `GET /health`.
+
+QueueApi writes ticket events to `queue.outbox_events` in the same transaction as the ticket change. A background publisher sends them to the `ticket-events` topic. If `ServiceBus:ConnectionString` is not set, events stay in the outbox until it is.
 
 QueueApi and ProfileApi accept browser requests only from the origins in `Cors:AllowedOrigins`. Development allows `http://localhost:3000` through `appsettings.Development.json`. Other environments set it with environment variables such as `Cors__AllowedOrigins__0=https://<frontend-host>`.
 
