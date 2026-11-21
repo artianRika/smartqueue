@@ -19,6 +19,7 @@ SmartQueue replaces physical waiting lines with virtual queues.
 
 - **Frontend:** Next.js + TypeScript
 - **Backend:** .NET 10, ASP.NET Core Web API, .NET Worker Service
+- **Authentication:** Clerk (JWT)
 - **Database:** PostgreSQL + Entity Framework Core
 - **Messaging:** Azure Service Bus Topics
 - **Real-time:** Azure SignalR Service
@@ -39,12 +40,13 @@ We have three independently deployable backend services:
 - Handles ticket numbering and concurrent staff operations.
 - Uses the transactional outbox pattern.
 - Publishes events to Azure Service Bus.
-- Handles SignalR connection setup.
+- Handles SignalR connection setup (negotiate).
+- Validates Clerk JWTs for protected endpoints.
 
 ### ProfileApi
 
-- Manages user profiles and application roles.
-- Uses an external identity provider for authentication.
+- Manages user profiles, organizations, and organization memberships.
+- Uses Clerk as the identity provider for authentication.
 
 ### NotificationWorker
 
@@ -62,25 +64,33 @@ We use one PostgreSQL database with two schemas.
 
 - `user_profiles`
 - `organizations`
+- `organization_memberships`
 
 ### `queue` schema — owned by QueueApi
+
+**MVP (implemented or in progress):**
 
 - `queues`
 - `queue_daily_counters`
 - `counters`
-- `counters_assignments`
+- `counter_assignments`
 - `tickets`
-- `time_slots`
-- `bookings`
 - `outbox_events`
 - `processed_events`
 - `notifications`
+
+**Later features:**
+
+- `time_slots`
+- `bookings`
 - `service_time_samples`
 - `service_time_averages`
 
-Each API has its own EF Core DbContext and migrations.
+Each API has its own EF Core DbContext and migrations. NotificationWorker uses a thin DbContext over `processed_events` / `notifications` and does not own migrations.
 
 Do not create database foreign keys across service boundaries. Store user IDs as UUID references instead.
+
+QueueApi may read `profile.*` (names, Clerk user id, membership roles) via SQL for display and authorization. This is a pragmatic semester-project decision, not a cross-service FK.
 
 The NotificationWorker processes notifications using tables in the queue schema. This is a pragmatic semester-project decision, not strict independent database ownership.
 
@@ -100,6 +110,7 @@ The NotificationWorker processes notifications using tables in the queue schema.
 - “Come Back Later” must support reordering independently of ticket numbers.
 - QR tokens must be cryptographically signed, with signing secrets stored in Azure Key Vault.
 - Automatic call timeouts using scheduled Service Bus messages are planned.
+- Staff authorization for a queue uses organization membership roles (Staff, OrganizationAdmin) or global SuperAdmin, not only the global profile role.
 
 ## 6. Repository Structure
 
@@ -107,15 +118,16 @@ The NotificationWorker processes notifications using tables in the queue schema.
 smartqueue/
 ├── frontend/
 ├── backend/
-│   ├── SmartQueue.slnx
+│   ├── SmartQueue.sln
 │   ├── QueueApi/
 │   ├── ProfileApi/
 │   └── NotificationWorker/
 ├── infrastructure/
 │   ├── docker-compose.yml
-│   └── terraform/
+│   ├── servicebus/
+│   └── terraform/          # planned
 ├── tests/
-│   └── load/
+│   └── load/               # planned (k6)
 └── .github/
     └── workflows/
 ```
@@ -124,9 +136,9 @@ We use one GitHub monorepo, but each service should be independently buildable a
 
 ## 7. Infrastructure and Deployment
 
-- Terraform manages Azure infrastructure.
-- GitHub Actions handles CI/CD, with separate workflows for the frontend, backend services, and Terraform.
-- The backend services run as separate Azure Container Apps.
+- Terraform manages Azure infrastructure (planned).
+- GitHub Actions handles CI today (build). Separate deploy workflows for frontend, backend services, and Terraform are planned.
+- The backend services run as separate Azure Container Apps (planned).
 
 ## 8. Instructions for the AI Assistant
 

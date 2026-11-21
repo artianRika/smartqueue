@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueueApi.Repositories.Interfaces;
 
@@ -19,6 +20,7 @@ public class QueueDailyCountersController : ControllerBase
     }
 
     // GET: api/queues/{queueId}/daily-counters
+    [AllowAnonymous]
     [HttpGet]
     public async Task<IActionResult> GetByQueue(Guid queueId)
     {
@@ -33,6 +35,7 @@ public class QueueDailyCountersController : ControllerBase
     }
 
     // GET: api/queues/{queueId}/daily-counters/{ticketDate}
+    [AllowAnonymous]
     [HttpGet("{ticketDate}")]
     public async Task<IActionResult> GetByDate(Guid queueId, DateOnly ticketDate)
     {

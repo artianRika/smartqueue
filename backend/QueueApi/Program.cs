@@ -1,7 +1,12 @@
 using System.Text.Json.Serialization;
+using Azure.Messaging.ServiceBus;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using QueueApi.Data;
 using QueueApi.Infrastructure;
+using QueueApi.Messaging;
 using QueueApi.Repositories;
 using QueueApi.Repositories.Interfaces;
 using QueueApi.Services;
@@ -27,8 +32,62 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod()));
 
+var clerkAuthority = builder.Configuration["Clerk:Authority"];
+
+if (string.IsNullOrWhiteSpace(clerkAuthority))
+    throw new InvalidOperationException("Clerk:Authority is missing.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = clerkAuthority;
+        options.RequireHttpsMetadata = true;
+        options.MapInboundClaims = false;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = clerkAuthority.TrimEnd('/'),
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            NameClaimType = "sub"
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddHealthChecks();
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter your Clerk JWT token."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.AddDbContext<QueueDbContext>(options =>
     options.UseNpgsql(
@@ -47,7 +106,34 @@ builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<IQueueDailyCounterRepository, QueueDailyCounterRepository>();
 builder.Services.AddScoped<IProfileLookup, ProfileLookup>();
 
+var serviceBusConnectionString = builder.Configuration["ServiceBus:ConnectionString"];
+
+if (!string.IsNullOrWhiteSpace(serviceBusConnectionString))
+{
+    builder.Services.AddSingleton(new ServiceBusClient(serviceBusConnectionString));
+    builder.Services.AddHostedService<OutboxPublisher>();
+}
+
+var signalRConnectionString = builder.Configuration["SignalR:ConnectionString"];
+
+if (!string.IsNullOrWhiteSpace(signalRConnectionString))
+{
+    builder.Services.AddSingleton(new SignalRNegotiateService(signalRConnectionString));
+}
+
 var app = builder.Build();
+
+if (string.IsNullOrWhiteSpace(serviceBusConnectionString))
+{
+    app.Logger.LogWarning(
+        "ServiceBus:ConnectionString is not set. Outbox events will be stored but not published.");
+}
+
+if (string.IsNullOrWhiteSpace(signalRConnectionString))
+{
+    app.Logger.LogWarning(
+        "SignalR:ConnectionString is not set. POST /api/signalr/negotiate returns 503.");
+}
 
 if (args.Contains("--seed"))
 {
@@ -64,6 +150,12 @@ if (args.Contains("--seed"))
     return;
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<QueueDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -73,8 +165,15 @@ if (app.Environment.IsDevelopment())
 // Before HTTPS redirection so preflight requests are answered instead of redirected
 app.UseCors(FrontendCorsPolicy);
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using QueueApi.Data;
 using QueueApi.DTOs;
 using QueueApi.Infrastructure;
+using QueueApi.Messaging;
 using QueueApi.Models;
 using QueueApi.Repositories.Interfaces;
 
@@ -87,6 +88,7 @@ public class TicketRepository : ITicketRepository
         };
 
         _context.Tickets.Add(ticket);
+        OutboxWriter.Add(_context, TicketEventTypes.TicketCreated, ticket);
         await RepositorySave.SaveChangesAsync(_context);
         await transaction.CommitAsync();
 
@@ -146,12 +148,19 @@ public class TicketRepository : ITicketRepository
             ("queueId", queueId),
             ("ticketDate", ticketDate));
 
+        if (ticketIdValue is not Guid ticketId)
+        {
+            await transaction.CommitAsync();
+            return null;
+        }
+
+        var ticket = await _context.Tickets.FirstAsync(x => x.Id == ticketId);
+
+        OutboxWriter.Add(_context, TicketEventTypes.TicketCalled, ticket);
+        await RepositorySave.SaveChangesAsync(_context);
         await transaction.CommitAsync();
 
-        if (ticketIdValue is not Guid ticketId)
-            return null;
-
-        return await GetByIdAsync(ticketId);
+        return ticket;
     }
 
     public Task<Ticket?> StartServiceAsync(Guid id)
@@ -160,6 +169,7 @@ public class TicketRepository : ITicketRepository
             id,
             TicketStatus.Called,
             TicketStatus.Serving,
+            TicketEventTypes.TicketServiceStarted,
             ticket => ticket.ServiceStartedAt = DateTime.UtcNow,
             "Only a called ticket can be started.");
     }
@@ -170,6 +180,7 @@ public class TicketRepository : ITicketRepository
             id,
             TicketStatus.Serving,
             TicketStatus.Completed,
+            TicketEventTypes.TicketCompleted,
             ticket => ticket.CompletedAt = DateTime.UtcNow,
             "Only a ticket in service can be completed.");
     }
@@ -185,6 +196,7 @@ public class TicketRepository : ITicketRepository
             throw new ConflictException("Only a waiting or called ticket can be cancelled.");
 
         ticket.Status = TicketStatus.Cancelled;
+        OutboxWriter.Add(_context, TicketEventTypes.TicketCancelled, ticket);
         await RepositorySave.SaveChangesAsync(_context);
 
         return ticket;
@@ -196,6 +208,7 @@ public class TicketRepository : ITicketRepository
             id,
             TicketStatus.Called,
             TicketStatus.NoShow,
+            TicketEventTypes.TicketNoShow,
             _ => { },
             "Only a called ticket can be marked as a no-show.");
     }
@@ -247,6 +260,7 @@ public class TicketRepository : ITicketRepository
         Guid id,
         TicketStatus requiredStatus,
         TicketStatus nextStatus,
+        string eventType,
         Action<Ticket> apply,
         string conflictMessage)
     {
@@ -260,6 +274,7 @@ public class TicketRepository : ITicketRepository
 
         ticket.Status = nextStatus;
         apply(ticket);
+        OutboxWriter.Add(_context, eventType, ticket);
         await RepositorySave.SaveChangesAsync(_context);
 
         return ticket;

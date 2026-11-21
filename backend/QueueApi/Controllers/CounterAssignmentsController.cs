@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueueApi.DTOs;
+using QueueApi.Infrastructure;
 using QueueApi.Models;
 using QueueApi.Repositories.Interfaces;
 using QueueApi.Services;
@@ -12,19 +14,23 @@ public class CounterAssignmentsController : ControllerBase
 {
     private readonly ICounterAssignmentRepository _assignments;
     private readonly ICounterRepository _counters;
+    private readonly IQueueRepository _queues;
     private readonly IProfileLookup _profiles;
 
     public CounterAssignmentsController(
         ICounterAssignmentRepository assignments,
         ICounterRepository counters,
+        IQueueRepository queues,
         IProfileLookup profiles)
     {
         _assignments = assignments;
         _counters = counters;
+        _queues = queues;
         _profiles = profiles;
     }
 
     // GET: api/counters/{counterId}/assignments
+    [AllowAnonymous]
     [HttpGet("/api/counters/{counterId:guid}/assignments")]
     public async Task<IActionResult> GetByCounter(Guid counterId)
     {
@@ -39,6 +45,7 @@ public class CounterAssignmentsController : ControllerBase
     }
 
     // GET: api/counters/{counterId}/assignments/active
+    [AllowAnonymous]
     [HttpGet("/api/counters/{counterId:guid}/assignments/active")]
     public async Task<IActionResult> GetActiveByCounter(Guid counterId)
     {
@@ -56,6 +63,7 @@ public class CounterAssignmentsController : ControllerBase
     }
 
     // GET: api/counter-assignments/active?staffUserId=
+    [AllowAnonymous]
     [HttpGet("active")]
     public async Task<IActionResult> GetActiveByStaff([FromQuery] Guid staffUserId)
     {
@@ -71,6 +79,7 @@ public class CounterAssignmentsController : ControllerBase
     }
 
     // GET: api/counter-assignments/{id}
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -83,6 +92,7 @@ public class CounterAssignmentsController : ControllerBase
     }
 
     // POST: api/counters/{counterId}/assignments
+    [Authorize]
     [HttpPost("/api/counters/{counterId:guid}/assignments")]
     public async Task<IActionResult> Create(
         Guid counterId,
@@ -91,17 +101,32 @@ public class CounterAssignmentsController : ControllerBase
         if (request.StaffUserId == Guid.Empty)
             return BadRequest("A valid staff user ID is required.");
 
+        var counter = await _counters.GetByIdAsync(counterId);
+
+        if (counter is null)
+            return NotFound();
+
+        var queue = await _queues.GetByIdAsync(counter.QueueId);
+
+        if (queue is null)
+            return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, queue.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
+
         var staff = await _profiles.GetUserAsync(request.StaffUserId);
 
         if (staff is null)
             return BadRequest("Staff user was not found.");
 
-        if (staff.Role is not ("Staff" or "OrganizationAdmin" or "SuperAdmin"))
-            return BadRequest("Only Staff, OrganizationAdmin, or SuperAdmin can be assigned to a counter.");
-        var counter = await _counters.GetByIdAsync(counterId);
+        var staffRole = await _profiles.GetOrganizationRoleAsync(
+            request.StaffUserId,
+            queue.OrganizationId);
 
-        if (counter is null)
-            return NotFound();
+        if (!OrganizationRoles.CanStaffQueue(staffRole))
+            return BadRequest("Only Staff, OrganizationAdmin, or SuperAdmin can be assigned to a counter.");
 
         var assignment = new CounterAssignment
         {
@@ -120,9 +145,30 @@ public class CounterAssignmentsController : ControllerBase
     }
 
     // PATCH: api/counter-assignments/{id}/end
+    [Authorize]
     [HttpPatch("{id:guid}/end")]
     public async Task<IActionResult> End(Guid id)
     {
+        var assignment = await _assignments.GetByIdAsync(id);
+
+        if (assignment is null)
+            return NotFound();
+
+        var counter = await _counters.GetByIdAsync(assignment.CounterId);
+
+        if (counter is null)
+            return NotFound();
+
+        var queue = await _queues.GetByIdAsync(counter.QueueId);
+
+        if (queue is null)
+            return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, queue.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
+
         var ended = await _assignments.EndAsync(id);
 
         if (!ended)
@@ -135,7 +181,9 @@ public class CounterAssignmentsController : ControllerBase
     {
         var staff = await _profiles.GetUserAsync(assignment.StaffUserId);
 
-        return CounterAssignmentResponse.From(assignment, $"{staff.FirstName} {staff.LastName}".Trim());
+        var name = staff is null ? null : $"{staff.FirstName} {staff.LastName}".Trim();
+
+        return CounterAssignmentResponse.From(assignment, name);
     }
 
     private async Task<List<CounterAssignmentResponse>> MapAssignmentsAsync(

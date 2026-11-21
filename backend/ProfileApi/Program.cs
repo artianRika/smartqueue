@@ -39,46 +39,6 @@ builder.Services
         options.RequireHttpsMetadata = true;
 
         options.MapInboundClaims = false;
-        
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                Console.WriteLine(
-                    $"Authorization header present: " +
-                    $"{context.Request.Headers.ContainsKey("Authorization")}"
-                );
-
-                return Task.CompletedTask;
-            },
-
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine("JWT VALIDATED SUCCESSFULLY!");
-
-                Console.WriteLine(
-                    $"Clerk User ID: {context.Principal?.FindFirst("sub")?.Value}"
-                );
-
-                return Task.CompletedTask;
-            },
-
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine($"JWT FAILED: {context.Exception}");
-
-                return Task.CompletedTask;
-            },
-
-            OnChallenge = context =>
-            {
-                Console.WriteLine(
-                    $"JWT CHALLENGE: {context.Error} - {context.ErrorDescription}"
-                );
-
-                return Task.CompletedTask;
-            }
-        };
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -92,6 +52,8 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddHealthChecks();
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -165,6 +127,12 @@ if (args.Contains("--seed"))
     return;
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ProfileDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 // Swagger
 if (app.Environment.IsDevelopment())
 {
@@ -183,6 +151,7 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();

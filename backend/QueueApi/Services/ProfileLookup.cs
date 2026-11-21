@@ -41,6 +41,73 @@ public class ProfileLookup : IProfileLookup
         return users.TryGetValue(userId, out var user) ? user : null;
     }
 
+    public async Task<ProfileUser?> GetUserByClerkIdAsync(string clerkUserId)
+    {
+        if (string.IsNullOrWhiteSpace(clerkUserId))
+            return null;
+
+        var connection = await OpenConnectionAsync();
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT "Id", "FirstName", "LastName", "Role"
+            FROM profile.user_profiles
+            WHERE "ClerkUserId" = @clerkUserId
+            LIMIT 1
+            """,
+            connection)
+        {
+            Transaction = CurrentTransaction()
+        };
+
+        command.Parameters.AddWithValue("clerkUserId", clerkUserId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (!await reader.ReadAsync())
+            return null;
+
+        return new ProfileUser
+        {
+            Id = reader.GetGuid(0),
+            FirstName = reader.GetString(1),
+            LastName = reader.GetString(2),
+            Role = reader.GetString(3)
+        };
+    }
+
+    public async Task<string?> GetOrganizationRoleAsync(Guid userId, Guid organizationId)
+    {
+        var user = await GetUserAsync(userId);
+
+        if (user is null)
+            return null;
+
+        if (user.Role == OrganizationRoles.SuperAdmin)
+            return OrganizationRoles.SuperAdmin;
+
+        var connection = await OpenConnectionAsync();
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT "Role"
+            FROM profile.organization_memberships
+            WHERE "UserId" = @userId AND "OrganizationId" = @organizationId
+            LIMIT 1
+            """,
+            connection)
+        {
+            Transaction = CurrentTransaction()
+        };
+
+        command.Parameters.AddWithValue("userId", userId);
+        command.Parameters.AddWithValue("organizationId", organizationId);
+
+        var role = await command.ExecuteScalarAsync();
+
+        return role as string;
+    }
+
     public async Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(
         IEnumerable<Guid> userIds)
     {
@@ -81,14 +148,11 @@ public class ProfileLookup : IProfileLookup
             {
                 var id = reader.GetGuid(0);
 
-                var firstName = reader.GetString(1);
-                var lastName = reader.GetString(2);
-
                 users[id] = new ProfileUser
                 {
                     Id = id,
-                    FirstName = firstName,
-                    LastName = lastName,
+                    FirstName = reader.GetString(1),
+                    LastName = reader.GetString(2),
                     Role = reader.GetString(3)
                 };
             });
@@ -109,15 +173,11 @@ public class ProfileLookup : IProfileLookup
         if (idList.Length == 0)
             return;
 
-        var connection = (NpgsqlConnection)_context.Database.GetDbConnection();
-
-        if (connection.State != System.Data.ConnectionState.Open)
-            await connection.OpenAsync();
+        var connection = await OpenConnectionAsync();
 
         await using var command = new NpgsqlCommand(sql, connection)
         {
-            Transaction = _context.Database.CurrentTransaction?
-                .GetDbTransaction() as NpgsqlTransaction
+            Transaction = CurrentTransaction()
         };
 
         command.Parameters.Add(
@@ -131,4 +191,17 @@ public class ProfileLookup : IProfileLookup
         while (await reader.ReadAsync())
             read(reader);
     }
+
+    private async Task<NpgsqlConnection> OpenConnectionAsync()
+    {
+        var connection = (NpgsqlConnection)_context.Database.GetDbConnection();
+
+        if (connection.State != System.Data.ConnectionState.Open)
+            await connection.OpenAsync();
+
+        return connection;
+    }
+
+    private NpgsqlTransaction? CurrentTransaction() =>
+        _context.Database.CurrentTransaction?.GetDbTransaction() as NpgsqlTransaction;
 }

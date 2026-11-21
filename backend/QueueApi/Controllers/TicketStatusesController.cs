@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueueApi.Models;
 
@@ -8,6 +9,7 @@ namespace QueueApi.Controllers;
 public class TicketStatusesController : ControllerBase
 {
     // GET: api/ticket-statuses
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult GetAll()
     {
