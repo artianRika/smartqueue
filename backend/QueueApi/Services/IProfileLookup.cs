@@ -8,5 +8,12 @@ public interface IProfileLookup
 
     Task<ProfileUser?> GetUserAsync(Guid userId);
 
+    Task<ProfileUser?> GetUserByClerkIdAsync(string clerkUserId);
+
+    /// <summary>
+    /// Membership role for the organization, or global SuperAdmin when applicable.
+    /// </summary>
+    Task<string?> GetOrganizationRoleAsync(Guid userId, Guid organizationId);
+
     Task<IReadOnlyDictionary<Guid, string>> GetUserNamesAsync(IEnumerable<Guid> userIds);
 }

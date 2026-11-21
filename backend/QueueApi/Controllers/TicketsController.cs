@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueueApi.DTOs;
 using QueueApi.Infrastructure;
@@ -29,6 +30,7 @@ public class TicketsController : ControllerBase
     }
 
     // GET: api/queues/{queueId}/tickets?status=&ticketDate=
+    [AllowAnonymous]
     [HttpGet("/api/queues/{queueId:guid}/tickets")]
     public async Task<IActionResult> GetByQueue(
         Guid queueId,
@@ -46,6 +48,7 @@ public class TicketsController : ControllerBase
     }
 
     // GET: api/tickets/{id}
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -58,6 +61,7 @@ public class TicketsController : ControllerBase
     }
 
     // GET: api/tickets/{id}/position
+    [AllowAnonymous]
     [HttpGet("{id:guid}/position")]
     public async Task<IActionResult> GetPosition(Guid id)
     {
@@ -70,16 +74,16 @@ public class TicketsController : ControllerBase
     }
 
     // POST: api/queues/{queueId}/tickets
+    [Authorize]
     [HttpPost("/api/queues/{queueId:guid}/tickets")]
-    public async Task<IActionResult> Create(Guid queueId, [FromBody] CreateTicketRequest request)
+    public async Task<IActionResult> Create(Guid queueId)
     {
-        if (request.UserId == Guid.Empty)
-            return BadRequest("A valid user ID is required.");
+        var profileResult = await this.RequireProfileAsync(_profiles);
 
-        var user = await _profiles.GetUserAsync(request.UserId);
+        if (profileResult.Result is not null)
+            return profileResult.Result;
 
-        if (user is null)
-            return BadRequest("User was not found.");
+        var user = profileResult.Value!;
 
         var queue = await _queues.GetByIdAsync(queueId);
 
@@ -89,7 +93,7 @@ public class TicketsController : ControllerBase
         if (!queue.IsOpen)
             throw new ConflictException("Queue is closed.");
 
-        var created = await _tickets.CreateAsync(queueId, request.UserId, queue.TicketPrefix);
+        var created = await _tickets.CreateAsync(queueId, user.Id, queue.TicketPrefix);
 
         return CreatedAtAction(
             nameof(GetById),
@@ -98,6 +102,7 @@ public class TicketsController : ControllerBase
     }
 
     // POST: api/counters/{counterId}/tickets/call-next
+    [Authorize]
     [HttpPost("/api/counters/{counterId:guid}/tickets/call-next")]
     public async Task<IActionResult> CallNext(Guid counterId)
     {
@@ -106,13 +111,18 @@ public class TicketsController : ControllerBase
         if (counter is null)
             return NotFound();
 
-        if (!counter.IsOpen)
-            throw new ConflictException("Counter is closed.");
-
         var queue = await _queues.GetByIdAsync(counter.QueueId);
 
         if (queue is null)
             return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, queue.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
+
+        if (!counter.IsOpen)
+            throw new ConflictException("Counter is closed.");
 
         if (!queue.IsOpen)
             throw new ConflictException("Queue is closed.");
@@ -126,46 +136,57 @@ public class TicketsController : ControllerBase
     }
 
     // PATCH: api/tickets/{id}/start
+    [Authorize]
     [HttpPatch("{id:guid}/start")]
     public async Task<IActionResult> Start(Guid id)
     {
-        var ticket = await _tickets.StartServiceAsync(id);
-
-        if (ticket is null)
-            return NotFound();
-
-        return Ok(await MapTicketAsync(ticket));
+        return await TransitionForStaffAsync(id, () => _tickets.StartServiceAsync(id));
     }
 
     // PATCH: api/tickets/{id}/complete
+    [Authorize]
     [HttpPatch("{id:guid}/complete")]
     public async Task<IActionResult> Complete(Guid id)
     {
-        var ticket = await _tickets.CompleteAsync(id);
-
-        if (ticket is null)
-            return NotFound();
-
-        return Ok(await MapTicketAsync(ticket));
+        return await TransitionForStaffAsync(id, () => _tickets.CompleteAsync(id));
     }
 
     // PATCH: api/tickets/{id}/cancel
+    [Authorize]
     [HttpPatch("{id:guid}/cancel")]
     public async Task<IActionResult> Cancel(Guid id)
     {
-        var ticket = await _tickets.CancelAsync(id);
-
-        if (ticket is null)
-            return NotFound();
-
-        return Ok(await MapTicketAsync(ticket));
+        return await TransitionForStaffAsync(id, () => _tickets.CancelAsync(id));
     }
 
     // PATCH: api/tickets/{id}/no-show
+    [Authorize]
     [HttpPatch("{id:guid}/no-show")]
     public async Task<IActionResult> MarkNoShow(Guid id)
     {
-        var ticket = await _tickets.MarkNoShowAsync(id);
+        return await TransitionForStaffAsync(id, () => _tickets.MarkNoShowAsync(id));
+    }
+
+    private async Task<IActionResult> TransitionForStaffAsync(
+        Guid ticketId,
+        Func<Task<Ticket?>> transition)
+    {
+        var existing = await _tickets.GetByIdAsync(ticketId);
+
+        if (existing is null)
+            return NotFound();
+
+        var queue = await _queues.GetByIdAsync(existing.QueueId);
+
+        if (queue is null)
+            return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, queue.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
+
+        var ticket = await transition();
 
         if (ticket is null)
             return NotFound();

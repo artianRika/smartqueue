@@ -56,6 +56,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__QueueDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       ServiceBus__ConnectionString: "Endpoint=sb://servicebus;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+      Clerk__Authority: ${CLERK_AUTHORITY:?Set CLERK_AUTHORITY in .env}
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +72,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__ProfileDb: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Clerk__Authority: ${CLERK_AUTHORITY:?Set CLERK_AUTHORITY in .env}
     depends_on:
       postgres:
         condition: service_healthy
