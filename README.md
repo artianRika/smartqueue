@@ -10,20 +10,21 @@ SmartQueue replaces physical waiting lines with digital tickets and a live queue
 
 ### Implemented
 
-- **Authentication (Clerk):** ProfileApi validates Clerk JWTs. Frontend sign-in uses Clerk.
+- **Authentication (Clerk):** ProfileApi and QueueApi validate Clerk JWTs. Frontend sign-in uses Clerk.
 - **Profiles & organizations:** User profiles, organizations, and organization memberships.
 - **Virtual queues:** Queues, counters, counter assignments, daily ticket numbers, ticket lifecycle.
 - **Concurrency control:** Atomic ticket numbering and `FOR UPDATE SKIP LOCKED` for call-next.
 - **Wait estimates:** Simple average based on recent completed tickets in the queue.
 - **Transactional outbox:** Ticket changes write to `queue.outbox_events` in the same transaction; QueueApi publishes to the Azure Service Bus `ticket-events` topic (emulator locally).
+- **NotificationWorker:** Consumes `ticket-events` / `notification-worker`, writes `processed_events` + `notifications` idempotently; pushes via Azure SignalR when `SignalR:ConnectionString` is set.
+- **SignalR negotiate:** `POST /api/signalr/negotiate` on QueueApi (503 if SignalR is not configured).
 - **Local stack:** Docker Compose for Postgres, Service Bus emulator, APIs, worker, and frontend.
 - **CI:** GitHub Actions builds the three .NET services and the Next.js frontend.
 
 ### Planned
 
-- **QueueApi Clerk JWT** and membership-based staff authorization (in progress on this branch).
-- **NotificationWorker** consuming `ticket-events` with idempotent `processed_events` / `notifications`.
-- **Azure SignalR** live UI updates (negotiate + worker push).
+- **Frontend wired to real APIs** (UI still uses mock data for queues/tickets).
+- **Browser SignalR client** for live ticket/queue updates.
 - **Come Back Later** ticket reordering.
 - **Cryptographic QR check-in** with secrets in Azure Key Vault.
 - **Automatic call timeouts** via scheduled Service Bus messages.
@@ -43,7 +44,7 @@ SmartQueue replaces physical waiting lines with digital tickets and a live queue
 | **Database** | PostgreSQL, Entity Framework Core |
 | **Hosting** | Azure Container Apps (planned) |
 | **Messaging** | Azure Service Bus Topics (emulator locally) |
-| **Real-Time Communication** | Azure SignalR Service (planned) |
+| **Real-Time Communication** | Azure SignalR Service (negotiate + worker push; browser client planned) |
 | **Secrets Management** | Azure Key Vault (planned) |
 | **Infrastructure as Code** | Terraform (planned) |
 | **Monitoring** | Azure Monitor, Application Insights, OpenTelemetry (planned) |
@@ -60,7 +61,7 @@ SmartQueue uses **one PostgreSQL database (`smartqueue`) with two schemas**.
 | Schema | Service | Tables |
 |---|---|---|
 | `profile` | ProfileApi | `user_profiles`, `organizations`, `organization_memberships` |
-| `queue` | QueueApi (& NotificationWorker) | **MVP today:** `queues`, `counters`, `counter_assignments`, `tickets`, `queue_daily_counters`, `outbox_events`. **Next:** `processed_events`, `notifications`. **Later:** `time_slots`, `bookings`, `service_time_samples` |
+| `queue` | QueueApi (& NotificationWorker) | **MVP today:** `queues`, `counters`, `counter_assignments`, `tickets`, `queue_daily_counters`, `outbox_events`, `processed_events`, `notifications`. **Later:** `time_slots`, `bookings`, `service_time_samples` |
 
 Each API manages its own EF Core DbContext and migrations. QueueApi may read `profile.*` for display names and roles; there are no cross-schema foreign keys.
 
@@ -83,7 +84,7 @@ From the project root:
 cp .env.example .env
 ```
 
-Update `.env` with PostgreSQL credentials, `SERVICEBUS_SQL_PASSWORD` (SQL Server complexity rules), and Clerk keys for the frontend. Development API connection strings in `appsettings.Development.json` must match `.env` (default password `smartqueue_dev`).
+Update `.env` with PostgreSQL credentials, `SERVICEBUS_SQL_PASSWORD` (SQL Server complexity rules), Clerk keys for the frontend, and `CLERK_AUTHORITY` (JWT issuer URL for both APIs). Development API connection strings in `appsettings.Development.json` must match `.env` (default password `smartqueue_dev`).
 
 ### 2. Start All Services
 
@@ -120,9 +121,38 @@ docker compose --env-file .env -f infrastructure/docker-compose.yml ps
 
 Both APIs expose `GET /health`.
 
-QueueApi writes ticket events to `queue.outbox_events` in the same transaction as the ticket change. A background publisher sends them to the `ticket-events` topic. If `ServiceBus:ConnectionString` is not set, events stay in the outbox until it is. The NotificationWorker will consume that subscription once implemented; until then the publisher still delivers messages to the emulator.
+QueueApi writes ticket events to `queue.outbox_events` in the same transaction as the ticket change. A background publisher sends them to the `ticket-events` topic. NotificationWorker consumes the `notification-worker` subscription, records `processed_events`, and inserts `notifications`. If `ServiceBus:ConnectionString` is not set on QueueApi, events stay in the outbox. If `SignalR:ConnectionString` is not set, the worker still stores notifications and skips realtime push.
 
 QueueApi and ProfileApi accept browser requests only from the origins in `Cors:AllowedOrigins`. Development allows `http://localhost:3000` through `appsettings.Development.json`. Other environments set it with environment variables such as `Cors__AllowedOrigins__0=https://<frontend-host>`.
+
+### QueueApi auth (Bearer token)
+
+| Access | Endpoints |
+|---|---|
+| Public | `GET /api/queues`, `GET /api/queues/{id}`, wait-estimate, `GET /api/tickets/{id}`, position, counters list, ticket statuses, `/health` |
+| Any signed-in user with a ProfileApi profile | `POST /api/queues/{id}/tickets` (no `userId` body; profile comes from the Clerk `sub`) |
+| Staff / OrganizationAdmin membership for that org, or global SuperAdmin | Queue/counter mutations, assignments, call-next, start, complete, cancel, no-show |
+| Signed-in | `POST /api/signalr/negotiate?ticketId=&queueId=` (requires `SignalR:ConnectionString`) |
+
+Manual API check after signing in on the frontend (`/dashboard` can log a JWT):
+
+```bash
+# Create profile once (ProfileApi)
+curl -s -X POST http://localhost:5002/api/userprofiles/me \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"firstName":"Alex","lastName":"Visitor","email":"alex@example.com"}'
+
+# Join a queue (QueueApi) — Registrar seed id below after ./backend/seed-dev.sh
+curl -s -X POST http://localhost:5001/api/queues/10000000-0000-0000-0000-000000000001/tickets \
+  -H "Authorization: Bearer $TOKEN"
+
+# Confirm the worker wrote a notification
+docker compose --env-file .env -f infrastructure/docker-compose.yml exec postgres \
+  psql -U smartqueue -d smartqueue -c 'SELECT "Type", "TicketId", "CreatedAt" FROM queue.notifications ORDER BY "CreatedAt" DESC LIMIT 5;'
+```
+
+Staff actions need a profile whose `organization_memberships.Role` is `Staff` or `OrganizationAdmin` for that queue’s organization (or global `SuperAdmin`). Seeded Sam/Dana UUIDs are not linked to Clerk until you set `ClerkUserId` or use a real login and promote the membership via ProfileApi.
 
 ### 5. View Logs
 
