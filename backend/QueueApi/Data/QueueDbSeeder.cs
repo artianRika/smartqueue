@@ -114,6 +114,10 @@ public static class QueueDbSeeder
             await context.CounterAssignments.Where(x => counterIds.Contains(x.CounterId)).ToListAsync());
         context.QueueDailyCounters.RemoveRange(
             await context.QueueDailyCounters.Where(x => queueIds.Contains(x.QueueId)).ToListAsync());
+        context.OutboxEvents.RemoveRange(
+            await context.OutboxEvents.Where(x => queueIds.Contains(x.QueueId)).ToListAsync());
+        context.Notifications.RemoveRange(
+            await context.Notifications.Where(x => queueIds.Contains(x.QueueId)).ToListAsync());
         await context.SaveChangesAsync();
 
         context.Counters.RemoveRange(

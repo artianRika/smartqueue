@@ -82,6 +82,45 @@ namespace QueueApi.Migrations
                     b.ToTable("counter_assignments", "queue");
                 });
 
+            modelBuilder.Entity("QueueApi.Models.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("QueueId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
+
+                    b.HasIndex("TicketId");
+
+                    b.HasIndex("QueueId", "CreatedAt");
+
+                    b.ToTable("notifications", "queue");
+                });
+
             modelBuilder.Entity("QueueApi.Models.OutboxEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -122,6 +161,20 @@ namespace QueueApi.Migrations
                         .HasFilter("\"PublishedAt\" IS NULL");
 
                     b.ToTable("outbox_events", "queue");
+                });
+
+            modelBuilder.Entity("QueueApi.Models.ProcessedEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("EventId");
+
+                    b.ToTable("processed_events", "queue");
                 });
 
             modelBuilder.Entity("QueueApi.Models.Queue", b =>
