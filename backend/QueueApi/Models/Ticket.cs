@@ -31,6 +31,10 @@ public class Ticket
 
     public DateTime? CompletedAt { get; set; }
 
+    // Maps to the Postgres xmin system column for optimistic concurrency
+    [JsonIgnore]
+    public uint Version { get; set; }
+
     [JsonIgnore]
     public Queue Queue { get; set; } = null!;
 

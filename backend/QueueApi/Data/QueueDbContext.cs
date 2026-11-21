@@ -123,6 +123,9 @@ public class QueueDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(20);
 
+            entity.Property(x => x.Version)
+                .IsRowVersion();
+
             entity.ToTable(t =>
                 t.HasCheckConstraint(
                     "CK_tickets_number",

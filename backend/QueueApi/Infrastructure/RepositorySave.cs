@@ -11,6 +11,10 @@ public static class RepositorySave
         {
             await context.SaveChangesAsync();
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException("The record was changed by another request.");
+        }
         catch (DbUpdateException exception)
         {
             var postgres = FindPostgresException(exception);
