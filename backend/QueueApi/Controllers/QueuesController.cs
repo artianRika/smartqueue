@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using QueueApi.DTOs;
+using QueueApi.Infrastructure;
 using QueueApi.Models;
 using QueueApi.Repositories.Interfaces;
 using QueueApi.Services;
@@ -23,6 +25,7 @@ public class QueuesController : ControllerBase
     }
 
     // GET: api/queues?organizationId=
+    [AllowAnonymous]
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] Guid? organizationId)
     {
@@ -35,6 +38,7 @@ public class QueuesController : ControllerBase
     }
 
     // GET: api/queues/{id}
+    [AllowAnonymous]
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -49,6 +53,7 @@ public class QueuesController : ControllerBase
     }
 
     // GET: api/queues/{id}/wait-estimate
+    [AllowAnonymous]
     [HttpGet("{id:guid}/wait-estimate")]
     public async Task<IActionResult> GetWaitEstimate(Guid id)
     {
@@ -61,11 +66,17 @@ public class QueuesController : ControllerBase
     }
 
     // POST: api/queues
+    [Authorize]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateQueueRequest request)
     {
         if (request.OrganizationId == Guid.Empty)
             return BadRequest("A valid organization ID is required.");
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, request.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
 
         var organizationName = await _profiles.GetOrganizationNameAsync(request.OrganizationId);
 
@@ -100,11 +111,22 @@ public class QueuesController : ControllerBase
     }
 
     // PUT: api/queues/{id}
+    [Authorize]
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateQueueRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Queue name is required.");
+
+        var existing = await _repository.GetByIdAsync(id);
+
+        if (existing is null)
+            return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, existing.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
 
         var queue = new Queue
         {
@@ -122,9 +144,20 @@ public class QueuesController : ControllerBase
     }
 
     // PATCH: api/queues/{id}/open
+    [Authorize]
     [HttpPatch("{id:guid}/open")]
     public async Task<IActionResult> SetOpen(Guid id, [FromBody] SetOpenRequest request)
     {
+        var existing = await _repository.GetByIdAsync(id);
+
+        if (existing is null)
+            return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, existing.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
+
         var updated = await _repository.SetOpenAsync(id, request.IsOpen);
 
         if (!updated)
@@ -134,9 +167,20 @@ public class QueuesController : ControllerBase
     }
 
     // DELETE: api/queues/{id}
+    [Authorize]
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
+        var existing = await _repository.GetByIdAsync(id);
+
+        if (existing is null)
+            return NotFound();
+
+        var forbidden = await this.RequireStaffForOrganizationAsync(_profiles, existing.OrganizationId);
+
+        if (forbidden is not null)
+            return forbidden;
+
         var deleted = await _repository.DeleteAsync(id);
 
         if (!deleted)

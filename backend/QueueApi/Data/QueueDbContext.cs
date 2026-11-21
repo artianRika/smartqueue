@@ -18,6 +18,12 @@ public class QueueDbContext : DbContext
     public DbSet<QueueDailyCounter> QueueDailyCounters
         => Set<QueueDailyCounter>();
 
+    public DbSet<OutboxEvent> OutboxEvents => Set<OutboxEvent>();
+
+    public DbSet<ProcessedEvent> ProcessedEvents => Set<ProcessedEvent>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("queue");
@@ -123,6 +129,9 @@ public class QueueDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(20);
 
+            entity.Property(x => x.Version)
+                .IsRowVersion();
+
             entity.ToTable(t =>
                 t.HasCheckConstraint(
                     "CK_tickets_number",
@@ -163,6 +172,58 @@ public class QueueDbContext : DbContext
                     "\"LastNumber\" >= 0"
                 )
             );
+        });
+
+        // OUTBOX EVENTS
+        modelBuilder.Entity<OutboxEvent>(entity =>
+        {
+            entity.ToTable("outbox_events");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Type)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Payload)
+                .IsRequired()
+                .HasColumnType("jsonb");
+
+            entity.Property(x => x.LastError)
+                .HasMaxLength(2000);
+
+            // Keeps the publisher's pending-events query small as published rows grow
+            entity.HasIndex(x => x.OccurredAt)
+                .HasFilter("\"PublishedAt\" IS NULL");
+        });
+
+        modelBuilder.Entity<ProcessedEvent>(entity =>
+        {
+            entity.ToTable("processed_events");
+
+            entity.HasKey(x => x.EventId);
+        });
+
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.ToTable("notifications");
+
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.Type)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(x => x.Payload)
+                .IsRequired()
+                .HasColumnType("jsonb");
+
+            entity.HasIndex(x => x.EventId)
+                .IsUnique();
+
+            entity.HasIndex(x => new { x.QueueId, x.CreatedAt });
+
+            entity.HasIndex(x => x.TicketId);
         });
     }
 }
