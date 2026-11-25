@@ -1,15 +1,15 @@
 import { fetchQueueApi } from "./client";
 import type { Ticket } from "../types";
 
-export async function getTicket(ticketId: string): Promise<Ticket> {
-  const ticketRes = await fetchQueueApi(`/api/tickets/${ticketId}`);
+export async function getTicket(ticketId: string, token?: string | null): Promise<Ticket> {
+  const ticketRes = await fetchQueueApi(`/api/tickets/${ticketId}`, undefined, token);
   if (!ticketRes.ok) throw new Error("Ticket not found.");
   const ticket = await ticketRes.json();
 
-  const posRes = await fetchQueueApi(`/api/tickets/${ticketId}/position`);
+  const posRes = await fetchQueueApi(`/api/tickets/${ticketId}/position`, undefined, token);
   const posData = posRes.ok ? await posRes.json() : { position: 0 };
 
-  const queueRes = await fetchQueueApi(`/api/queues/${ticket.queueId}`);
+  const queueRes = await fetchQueueApi(`/api/queues/${ticket.queueId}`, undefined, token);
   const queueData = queueRes.ok ? await queueRes.json() : { name: "Service Queue" };
 
   return {
@@ -26,26 +26,25 @@ export async function getTicket(ticketId: string): Promise<Ticket> {
   };
 }
 
-export async function moveBackTicket(ticketId: string): Promise<Ticket> {
-  const ticket = await getTicket(ticketId);
-  ticket.positionAhead = (ticket.positionAhead || 0) + 3;
-  ticket.estimatedWaitMin = (ticket.estimatedWaitMin || 0) + 6;
-  return ticket;
+export async function moveBackTicket(ticketId: string, token?: string | null): Promise<Ticket> {
+  const res = await fetchQueueApi(
+    `/api/tickets/${ticketId}/postpone`,
+    { method: "PATCH" },
+    token
+  );
+  if (!res.ok) throw new Error("Failed to move ticket back in queue.");
+  return await getTicket(ticketId, token);
 }
 
-export async function cancelTicket(ticketId: string): Promise<{ success: boolean }> {
-  const res = await fetchQueueApi(`/api/tickets/${ticketId}/cancel`, {
-    method: "PATCH",
-  });
+export async function cancelTicket(
+  ticketId: string,
+  token?: string | null
+): Promise<{ success: boolean }> {
+  const res = await fetchQueueApi(
+    `/api/tickets/${ticketId}/cancel`,
+    { method: "PATCH" },
+    token
+  );
   if (!res.ok) throw new Error("Failed to cancel ticket.");
   return { success: true };
-}
-
-export async function updateNotificationLeadTime(
-  ticketId: string,
-  leadTime: number
-): Promise<Ticket> {
-  const ticket = await getTicket(ticketId);
-  ticket.notificationLeadTime = leadTime;
-  return ticket;
 }

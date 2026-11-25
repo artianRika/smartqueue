@@ -16,7 +16,7 @@ export default function StaffPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 flex flex-col">
-      <Navbar />
+      {/* <Navbar /> */}
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
