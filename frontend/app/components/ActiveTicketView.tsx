@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import type { Ticket } from "@/app/libs/types";
 import { moveBackTicket, cancelTicket } from "../libs/api/tickets";
 
@@ -11,13 +12,15 @@ interface ActiveTicketViewProps {
 
 export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProps) {
   const router = useRouter();
+  const { getToken } = useAuth();
   const [ticket, setTicket] = useState<Ticket>(initialTicket);
   const [busy, setBusy] = useState(false);
 
   async function handleMoveBack() {
     setBusy(true);
     try {
-      const updated = await moveBackTicket(ticket.id);
+      const token = await getToken();
+      const updated = await moveBackTicket(ticket.id, token);
       setTicket(updated);
     } catch (error) {
       console.error("Failed to move back in queue", error);
@@ -29,7 +32,8 @@ export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProp
   async function handleLeaveQueue() {
     setBusy(true);
     try {
-      await cancelTicket(ticket.id);
+      const token = await getToken();
+      await cancelTicket(ticket.id, token);
       router.push("/services");
     } catch (error) {
       console.error("Failed to leave queue", error);
@@ -41,13 +45,11 @@ export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProp
   const isCompleted = ticket.status === "Completed";
   const isNoShow = ticket.status === "NoShow" || ticket.status === "Cancelled";
 
-  // Calculate mock current serving ticket number safely
   const currentNum = parseInt(ticket.number.replace(/\D/g, ""), 10) || 42;
   const servingTicketNum = `A-0${Math.max(1, currentNum - ticket.positionAhead)}`;
 
   return (
     <div className="w-full max-w-md mx-auto flex flex-col gap-5">
-      {/* Top Banner Status */}
       {isCalled && (
         <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-center animate-pulse">
           <p className="font-bold text-lg">It's your turn!</p>
@@ -55,18 +57,15 @@ export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProp
         </div>
       )}
 
-      {/* Main Ticket Container */}
       <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 text-center">
         <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">
           {ticket.serviceName}
         </span>
         
-        {/* Ticket Big Number */}
         <h1 className="text-5xl font-extrabold text-sky-600 mt-2 mb-4">{ticket.number}</h1>
 
         {!isCalled && !isCompleted && !isNoShow && (
           <>
-            {/* Visual Queue Nodes Tracker */}
             <div className="flex items-center justify-center gap-2 my-4">
               <span className="text-[11px] font-semibold text-gray-400 font-mono">{servingTicketNum}</span>
               <div className="flex items-center gap-1.5 px-2">
@@ -78,7 +77,6 @@ export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProp
               <span className="text-[11px] font-semibold text-sky-600 font-mono">{ticket.number}</span>
             </div>
 
-            {/* 3-Column Metrics Grid */}
             <div className="grid grid-cols-3 gap-2 py-3 px-2 bg-gray-50 rounded-xl border border-gray-200 my-4 text-center">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Serving</p>
@@ -98,7 +96,6 @@ export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProp
           </>
         )}
 
-        {/* QR Code Verification Section */}
         <div className="mt-5 flex flex-col items-center">
           <p className="text-xs text-gray-500 mb-2">Scan at counter to check in</p>
           <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl shadow-2xs">
@@ -116,7 +113,6 @@ export default function ActiveTicketView({ initialTicket }: ActiveTicketViewProp
         </div>
       </div>
 
-      {/* Action Controls */}
       {!isCalled && !isCompleted && !isNoShow && (
         <div className="flex flex-col gap-2.5">
           <button

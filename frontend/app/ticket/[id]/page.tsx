@@ -54,7 +54,7 @@ function TicketContent({ params }: { params: Promise<{ id: string }> }) {
 export default function TicketPage({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 flex flex-col">
-      <Navbar />
+      {/* <Navbar /> */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8 flex flex-col items-center">
         <Suspense fallback={<div className="py-20 text-center text-sm text-gray-500">Loading active ticket...</div>}>
           <TicketContent params={params} />

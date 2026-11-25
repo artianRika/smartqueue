@@ -1,12 +1,17 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth, useUser } from "@clerk/nextjs";
+import { getOrCreateProfileUser } from "@/app/libs/api/auth";
 import { joinQueue } from "../libs/api/queues";
 import type { ServiceQueue } from "@/app/libs/types";
 
 export default function ServiceCard({ service }: { service: ServiceQueue }) {
   const router = useRouter();
+  const { getToken } = useAuth();
+  const { user } = useUser();
   const [isJoining, setIsJoining] = useState(false);
   const [existingTicketId, setExistingTicketId] = useState<string | null>(null);
 
@@ -31,9 +36,16 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
       }
 
       try {
+        const token = await getToken();
         const res = await fetch(
-          `http://localhost:5087/api/tickets/${storedTicketId}`
+          `http://localhost:5001/api/tickets/${storedTicketId}`,
+          {
+            headers: {
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          }
         );
+
         if (res.ok) {
           const ticket = await res.json();
           const isActive =
@@ -45,7 +57,6 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
           }
         }
 
-        // Remove cancelled, completed, or missing tickets from localStorage
         delete activeTickets[service.id];
         localStorage.setItem(
           "smartQueue_activeTickets",
@@ -63,7 +74,7 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
       isMounted = false;
       window.removeEventListener("pageshow", syncTicketState);
     };
-  }, [service.id]);
+  }, [service.id, getToken]);
 
   const handleAction = async () => {
     if (existingTicketId) {
@@ -73,8 +84,33 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
 
     try {
       setIsJoining(true);
-      const ticket = await joinQueue(service.id);
-      const assignedTicketId = ticket.ticketId || (ticket as { id?: string }).id;
+
+      const token = await getToken();
+
+      if (!token) {
+        throw new Error("Clerk authentication token is missing. Please sign in again.");
+      }
+
+      const email = user?.primaryEmailAddress?.emailAddress;
+
+      if (!email) {
+        throw new Error("Please sign in again. User email not found.");
+      }
+
+      const fullName =
+        user.fullName ||
+        [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+        email.split("@")[0];
+
+      const profile = await getOrCreateProfileUser(
+        fullName,
+        email,
+        token
+      );
+
+      const ticket = await joinQueue(service.id, profile.id, token);
+      const assignedTicketId =
+        ticket.ticketId || (ticket as { id?: string }).id;
 
       if (!assignedTicketId) {
         throw new Error("No ticket ID returned from server.");
@@ -83,7 +119,9 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
       const activeTickets = JSON.parse(
         localStorage.getItem("smartQueue_activeTickets") || "{}"
       );
+
       activeTickets[service.id] = assignedTicketId;
+
       localStorage.setItem(
         "smartQueue_activeTickets",
         JSON.stringify(activeTickets)
@@ -92,7 +130,7 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
       setExistingTicketId(assignedTicketId);
       router.push(`/ticket/${assignedTicketId}`);
     } catch (err) {
-      console.error(err);
+      console.error("Join queue failed:", err);
     } finally {
       setIsJoining(false);
     }
@@ -100,13 +138,13 @@ export default function ServiceCard({ service }: { service: ServiceQueue }) {
 
   const getButtonStyle = () => {
     if (isJoining) {
-      return "bg-[var(--color-sky-600)] opacity-70 text-white cursor-wait";
+      return "bg-sky-600 opacity-70 text-white cursor-wait";
     }
     if (existingTicketId) {
-      return "bg-white text-[var(--color-sky-600)] border-2 border-[var(--color-sky-600)] hover:bg-sky-50";
+      return "bg-white text-sky-600 border-2 border-sky-600 hover:bg-sky-50";
     }
     if (isServiceOpen) {
-      return "bg-[var(--color-sky-600)] hover:opacity-90 text-white";
+      return "bg-sky-600 hover:opacity-90 text-white";
     }
     return "bg-gray-100 text-gray-400 cursor-not-allowed";
   };
