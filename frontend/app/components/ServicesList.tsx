@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import ServiceCard from "@/app/components/ServiceCard";
 import type { ServiceQueue } from "@/app/libs/types";
-import { getServices } from "@/app/libs/api";
+import { getServices } from "../libs/api/queues";
 
 export default function ServicesList() {
   const [services, setServices] = useState<ServiceQueue[]>([]);

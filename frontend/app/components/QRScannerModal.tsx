@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { verifyAndCheckInTicket } from "@/app/libs/api";
+import { verifyAndCheckInTicket } from "../libs/api/staff";
 
 interface QRScannerModalProps {
   isOpen: boolean;

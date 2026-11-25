@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import type { ServiceQueue, Ticket } from "@/app/libs/types";
-import { callNextTicket, markTicketServed, markTicketMissed, toggleQueueStatus, getStaffQueue } from "@/app/libs/api";
+import { toggleQueueStatus } from "@/app/libs/api/queues";
+import { callNextTicket, markTicketServed, markTicketMissed, getStaffQueue } from "@/app/libs/api/staff";
 
 export default function StaffDashboard({ serviceId }: { serviceId: string }) {
   const [queue, setQueue] = useState<ServiceQueue | null>(null);
@@ -31,7 +32,7 @@ export default function StaffDashboard({ serviceId }: { serviceId: string }) {
       const result = await callNextTicket(serviceId);
       setCurrentTicket(result.ticket);
       if (queue) {
-        setQueue({ ...queue, waiting: Math.max(0, queue.waiting - 1) });
+        setQueue({ ...queue, waiting: Math.max(0, (queue.waiting ?? 0) - 1) });
       }
     } catch (error) {
       console.error("Failed to call next ticket", error);

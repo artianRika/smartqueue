@@ -3,19 +3,39 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signInUser } from "@/app/libs/api/auth";
 
 export default function SignInForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    router.push("/services");
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      await signInUser(email);
+      router.push("/services");
+    } catch (err: any) {
+      console.error("Sign in failed:", err);
+      setErrorMsg(err.message || "Failed to sign in. Please check your email.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      {errorMsg && (
+        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 font-medium text-center">
+          {errorMsg}
+        </div>
+      )}
+
       <div className="flex flex-col gap-1.5 text-left">
         <label htmlFor="email" className="text-sm font-semibold text-gray-700">
           Email
@@ -48,9 +68,10 @@ export default function SignInForm() {
 
       <button
         type="submit"
-        className="w-full py-2.5 px-4 mt-2 bg-sky-600 hover:bg-sky-700 text-white font-medium rounded-lg shadow-sm transition-colors cursor-pointer"
+        disabled={loading}
+        className="w-full py-2.5 px-4 mt-2 bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-medium rounded-lg shadow-sm transition-colors cursor-pointer"
       >
-        Sign in
+        {loading ? "Signing in..." : "Sign in"}
       </button>
 
       <div className="text-sm text-gray-600 text-center mt-2">
