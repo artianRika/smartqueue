@@ -33,7 +33,7 @@ export async function getStaffQueue(counterId: string): Promise<StaffQueueData> 
           number: currentTicketData.ticketNumber,
           serviceId: counter.queueId,
           serviceName: queueData.name,
-          status: "called",
+          status: "Called",
           positionAhead: 0,
           estimatedWaitMin: 0,
           counterId: counter.name,

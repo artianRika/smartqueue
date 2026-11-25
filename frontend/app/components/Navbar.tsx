@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { Menu, X, Ticket, User, LogOut, LayoutDashboard } from "lucide-react";
 
-export default function Navbar() {
+function NavbarContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -173,5 +173,13 @@ export default function Navbar() {
         </div>
       )}
     </nav>
+  );
+}
+
+export default function Navbar() {
+  return (
+    <Suspense fallback={<div className="h-16 w-full bg-white border-b border-gray-200" />}>
+      <NavbarContent />
+    </Suspense>
   );
 }
