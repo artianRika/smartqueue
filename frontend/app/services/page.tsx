@@ -6,6 +6,7 @@ import { useEffect } from "react";
 
 import Navbar from "@/app/components/Navbar";
 import ServicesList from "@/app/components/ServicesList";
+import ProfileSync from "@/app/components/ProfileSync";
 
 export default function ServicesPage() {
     const router = useRouter();
@@ -27,6 +28,7 @@ export default function ServicesPage() {
 
     return (
         <div className="min-h-screen bg-gray-100 text-gray-900 flex flex-col">
+            <ProfileSync />
             <Navbar />
 
             <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8">
